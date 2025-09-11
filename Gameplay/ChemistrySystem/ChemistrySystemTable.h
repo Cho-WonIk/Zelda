@@ -1,0 +1,160 @@
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
+#include "NiagaraSystem.h"
+#include "ChemistrySystemTable.generated.h"
+
+USTRUCT(BlueprintType)
+struct FMaterialCDO : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	// 물질 태그
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "물질", GameplayTagFilter = "Material"))
+	FGameplayTag Tag;
+
+	// 원소별 임계치(예: 불, 물, 전기 등) 증감량
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "임계값 증감량", GameplayTagFilter = "Element"))
+	TMap<FGameplayTag, float> ThresholdDelta;
+
+	// 원소별 임계치
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "임계값", GameplayTagFilter = "Element"))
+	TMap<FGameplayTag, float> Threshold;
+};
+
+USTRUCT(BlueprintType)
+struct FElementCDO : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	// 원소 태그
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소", GameplayTagFilter = "Element"))
+	FGameplayTag Tag;
+
+	// 확산 카운트 최대값
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산될 수 있는 최대값"))
+	int32 MaxSpreadingCount = 0;
+
+	// 확산 범위
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 범위"))
+	float SpreadingRange = 0;
+
+	/*==== FX ====*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX", meta = (DisplayName = "지속되는 VFX"))
+	TSoftObjectPtr<UNiagaraSystem> LoopVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX", meta = (DisplayName = "지속되는 SFX"))
+	TSoftObjectPtr<USoundBase> LoopSFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX", meta = (DisplayName = "시작 VFX"))
+	TSoftObjectPtr<UNiagaraSystem> StartVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX", meta = (DisplayName = "시작 SFX"))
+	TSoftObjectPtr<USoundBase> StartSFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX", meta = (DisplayName = "끝 VFX"))
+	TSoftObjectPtr<UNiagaraSystem> EndVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX", meta = (DisplayName = "끝 SFX"))
+	TSoftObjectPtr<USoundBase> EndSFX;
+
+
+	/*==== 머티리얼 ====*/
+	TSoftObjectPtr<class UMaterialInterface> OverlayMaterial;
+};
+
+USTRUCT(BlueprintType)
+struct FReactionOut
+{
+	GENERATED_BODY()
+
+	// 부착할 원소 엘리먼트, 없을 수 있음
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GameplayTagFilter = "Element"))
+	FGameplayTag NewElementTag;
+
+	// 데미지 단발성 <-> 지속성
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "데미지 지속성"))
+	bool bIsDamageOnce = false;
+
+	// 원소 초기 데미지
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 초기데미지"))
+	float ElementFirstDamage = 0.0f;
+
+	// 원소 틱 데미지
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 틱 데미지"))
+	float ElementTickDamage;
+
+	// 원소 지속시간
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "지속시간", ToolTip = "원소 지속 시간"))
+	float Duration = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FReactionRuleRow : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	// 소스(보통 원소)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "Source"))
+	FGameplayTag SourceTag;
+
+	// 타겟(재질이든 원소든 구분 없이 태그 하나)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "Target"))
+	FGameplayTag TargetTag;
+
+	// 결과
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "Outcome"))
+	FReactionOut Outcome;
+};
+
+struct FReactionKey
+{
+	FGameplayTag SourceTag;
+
+	FGameplayTag TargetTag;
+
+	bool operator==(const FReactionKey& Rhs) const
+	{
+		return SourceTag == Rhs.SourceTag && TargetTag == Rhs.TargetTag;
+	}
+
+	friend uint32 GetTypeHash(const FReactionKey& K)
+	{
+		return HashCombine(GetTypeHash(K.SourceTag), GetTypeHash(K.TargetTag));
+	}
+};
+
+USTRUCT()
+struct FElementInstanceData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient) TObjectPtr<UNiagaraSystem> StartVFX = nullptr;
+	UPROPERTY(Transient) TObjectPtr<UNiagaraSystem> LoopVFX = nullptr;
+	UPROPERTY(Transient) TObjectPtr<UNiagaraSystem> EndVFX = nullptr;
+
+	UPROPERTY(Transient) TObjectPtr<USoundBase> StartSFX = nullptr;
+	UPROPERTY(Transient) TObjectPtr<USoundBase> LoopSFX = nullptr;
+	UPROPERTY(Transient) TObjectPtr<USoundBase> EndSFX = nullptr;
+
+	// 확산 카운트
+	int32 MaxSpreadingCount = 0;
+
+	// 확산 범위
+	float SpreadingRange = 0;
+};
+
+USTRUCT()
+struct FMaterialInstanceData
+{
+	GENERATED_BODY()
+
+	// 원소별 임계치(예: 불, 물, 전기 등) 증감량
+	UPROPERTY(Transient) TMap<FGameplayTag, float> ThresholdDelta;
+
+	// 원소별 임계치
+	UPROPERTY(Transient) TMap<FGameplayTag, float> Threshold;
+};

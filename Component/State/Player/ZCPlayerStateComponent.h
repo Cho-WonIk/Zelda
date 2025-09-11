@@ -1,0 +1,30 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Component/State/ZCStateComponent.h"
+#include "ZCPlayerStateComponent.generated.h"
+
+/**
+ * 
+ */
+UCLASS()
+class ZELDA_API UZCPlayerStateComponent : public UZCStateComponent
+{
+	GENERATED_BODY()
+	
+public:
+	UZCPlayerStateComponent();
+
+protected:
+	// 방어구
+	FGameplayTagContainer ArmorTags;
+
+	// 버프
+	FGameplayTag BuffTag;
+
+	// 환경
+	FGameplayTag StatusTags;
+
+};
