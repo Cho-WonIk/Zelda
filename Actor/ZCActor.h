@@ -22,10 +22,12 @@ public:
 	AZCActor();
 
 public:
-	FORCEINLINE UZCMaterialStateComponent* GetMaterialStateComponent() const { return MaterialStateComponent.Get(); }
-	FORCEINLINE UZCNiagaraComponent* GetZCNiagaraComponent() const { return NiagaraComponent.Get(); }
+	FORCEINLINE UZCMaterialStateComponent* GetMaterialStateComponent() const { return MaterialStateComponent; }
+	FORCEINLINE UZCNiagaraComponent* GetZCNiagaraComponent() const { return NiagaraComponent; }
 
-protected:
+	virtual void PostInitializeComponents() override;
+
+public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
 protected:
@@ -36,18 +38,9 @@ protected:
 	TObjectPtr<class UZCMaterialStateComponent> MaterialStateComponent;
 
 protected:
-	// 액터가 데미지를 받을 수 있는지 여부
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zelda|Actor", meta = (AllowPrivateAccess = "true", DisplayName = "피격 가능 여부"))
-	bool bCanDamaged = true;
-
 	// 액터가 원소와 상호작용하는지 여부
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Zelda|Actor", meta = (AllowPrivateAccess = "true", DisplayName = "원소 상호작용 여부"))
 	bool bCanElementalReaction = true;
 
-	// 현재 액터 상태
-	FGameplayTag CurrentElementalTag;
-
-	// 원소 반응 리액션 태그
-	FGameplayTag ElementalReactionTag;
-
+protected:
 };

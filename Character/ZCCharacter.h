@@ -102,6 +102,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	UZCHitReactionComponent* GetHitReactionComponent() const { return HitReactionComponent; }
 
+	UFUNCTION(BlueprintPure)
+	UZCNiagaraComponent* GetZCNiagaraComponent() const { return NiagaraComponent; }
+
 	/*=================오버라이드 함수들===============*/
 protected:
 	virtual void BeginPlay() override;
@@ -184,5 +187,8 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hit Reaction")
 	TObjectPtr<UZCHitReactionComponent> HitReactionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
+	TObjectPtr<class UZCNiagaraComponent> NiagaraComponent;
 
 };

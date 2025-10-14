@@ -6,7 +6,8 @@
 
 #include "Component/HitTrace/ZCHitTraceComponent.h"
 #include "Physics/ZCCollision.h"
-#include "Game/Subsystem/ZCItemGISubsystem.h"
+
+#include "World/Subsystem/ZCWorldSubsystem.h"
 
 #include "GameFramework/DamageType.h"
 #include "Engine/DamageEvents.h"
@@ -30,6 +31,13 @@ void AZCWeaponActor::Initialize(FZCItemTable* NewItem)
 	if (Info->Type == EItemType::Weapon)
 	{
 		WeaponInfo = static_cast<FZCWeaponTable*>(Info);
+
+		if (const FElementInstanceData * const ElementInfo = GetWorld()->GetSubsystem<UZCWorldSubsystem>()->GetObjectElementInstanceData(WeaponInfo->ElementType))
+		{
+			WeaponElementInfo.ElementTag = WeaponInfo->ElementType;
+			WeaponElementInfo.SpreadCount = ElementInfo->MaxSpreadingCount;
+
+		}
 	}
 }
 
@@ -60,7 +68,6 @@ void AZCWeaponActor::OnHitActor(AActor* HitActor, const FHitResult& HitResult)
 {
 	if (HitActor)
 	{
-		FElementInfo NewInfo(WeaponInfo->ElementType);
-		UZCGameplayFunctionLibrary::ApplyPointDamage(NewInfo, HitActor, WeaponInfo->AttackPower, HitResult.Location, HitResult, GetOwner()->GetInstigatorController(), this, WeaponInfo->DamageTypeTag);
+		UZCGameplayFunctionLibrary::ApplyPointDamage(WeaponElementInfo, HitActor, WeaponInfo->AttackPower, HitResult.Location, HitResult, GetOwner()->GetInstigatorController(), this, WeaponInfo->DamageTypeTag);
 	}
 }

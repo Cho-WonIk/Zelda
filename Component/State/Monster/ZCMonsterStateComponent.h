@@ -15,5 +15,6 @@ public:
 	UZCMonsterStateComponent();
 
 protected:
+	virtual void BeginPlay() override;
 
 };

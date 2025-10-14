@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Actor/Item/ZCItemActor.h"
+#include "Gameplay/ZCElementInfo.h"
 #include "ZCWeaponActor.generated.h"
 
 UENUM(BlueprintType)
@@ -33,7 +34,7 @@ protected:
 public:
 	virtual void Initialize(FZCItemTable* NewItem) override;
 	
-	/*===========Getter===========*/
+	/*===========Getter / Settger===========*/
 public:
 	FORCEINLINE const struct FZCWeaponTable* GetWeaponInfo() const { return WeaponInfo; }
 	FORCEINLINE const EWeaponType GetWeaponType() const { return WeaponInfo->WeaponType; }
@@ -65,6 +66,8 @@ protected:
 
 private:
 	EAttackType AttackType = EAttackType::Normal;
+
+	FElementInfo WeaponElementInfo{};
 
 	uint8 AttackChargingGauge = 0;
 };

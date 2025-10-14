@@ -152,34 +152,3 @@ bool UZCGameplayFunctionLibrary::ApplyRadialDamageWithFalloff(FElementInfo& Elem
 
 	return bAppliedDamage;
 }
-
-float UZCGameplayFunctionLibrary::CalculateDamage(float BaseDamage, EElementRel ElementResult, bool IsCriticalBone, float ArmorState)
-{
-	float DamageMultiplier = 1.0f;
-
-	float FinalDamage = BaseDamage;
-
-	switch (ElementResult)
-	{
-	case EElementRel::Weak:
-		DamageMultiplier = 1.5f; // 약점 관계, 피해량 증가
-		break;
-	case EElementRel::Neutral:
-		DamageMultiplier = 1.0f; // 중립 관계, 피해량 그대로
-		break;
-	case EElementRel::Strong:
-		DamageMultiplier = 0.5f; // 강점 관계, 피해량 감소
-		break;
-	}
-
-	DamageMultiplier *= (IsCriticalBone ? 2.0f : 1.0f); // 약점 부위 피격 여부에 따른 배수 적용
-
-	FinalDamage *= DamageMultiplier;
-
-	if (ArmorState > 0.0f)
-	{
-		FinalDamage -= ArmorState; // 방어력에 따른 피해 감소
-	}
-
-	return FinalDamage;
-}

@@ -12,9 +12,12 @@
 #include "Gameplay/Damage/ZCDamage.h"
 #include "Gameplay/GameplayTag/ZCGameplayTag.h"
 
+#include "Component/VFX/ZCNiagaraComponent.h"
 #include "Component/State/ZCStateComponent.h"
 #include "Actor/Item/Weapon/ZCWeaponActor.h"
 #include "Actor/Item/Shield/ZCShieldActor.h"
+
+#include "Gameplay/ZCGameplayFunctionLibrary.h"
 
 #include "Development/ZCLogger.h"
 
@@ -27,6 +30,8 @@ AZCCharacter::AZCCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	PrimaryActorTick.bCanEverTick = false;
 
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+
+	NiagaraComponent = CreateDefaultSubobject<UZCNiagaraComponent>(TEXT("NiagaraComponent"));
 
 	PhysicsControlComponent = CreateDefaultSubobject<UPhysicsControlComponent>(TEXT("PhysicsControlComponent"));
 	PhysicsControlComponent->SetupAttachment(RootComponent);
@@ -135,15 +140,8 @@ void AZCCharacter::PostInitializeComponents()
 	StateComponent->OnHealthZero.AddUObject(this, &AZCCharacter::OnDeath);
 	StateComponent->OnStaggerFull.AddUObject(this, &AZCCharacter::OnStagger);
 
-	//const AActor* /*HitCauser*/, const FHitResult& /*HitResult*/, const uint8 /*Enum As Byte, InputHitStrength*/, const bool /*UseCauseDeath*/, const bool /*UseHitCurserDirection*/
-	StateComponent->OnHit.AddLambda(
-		[this](const AActor* HitCauser, const FHitResult& HitResult, const uint8 EnumAsByte, const bool UseCauseDeath, const bool UseHitCurserDirection)
-		{
-			if (HitReactionComponent)
-			{
-				HitReactionComponent->PerformHitReaction(HitCauser, HitResult, static_cast<EHitStrength>(EnumAsByte), UseCauseDeath, UseHitCurserDirection);
-			}
-		});
+	StateComponent->SetVFXComponent(NiagaraComponent);
+	StateComponent->SetOwnerCharacter(this);
 }
 
 float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -153,12 +151,12 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	FGameplayTag DamageTypeTag = FGameplayTag::EmptyTag;
-	FGameplayTag ElementTag = FGameplayTag::EmptyTag;
 
 	const UZCDamageType* const DamageTypeCDO = DamageEvent.DamageTypeClass ? DamageEvent.DamageTypeClass->GetDefaultObject<UZCDamageType>() : GetDefault<UZCDamageType>();
 
 	DamageTypeTag = DamageTypeCDO ? DamageTypeCDO->DamageTypeTag : FGameplayTag::EmptyTag;
 
+	FElementInfo ElementInfo;
 
 	// 히트 정보
 	bool bIsCritial = false;
@@ -167,13 +165,19 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 	if (DamageEvent.IsOfType(FZCDamageEvent::ClassID))
 	{
 		const FZCDamageEvent* ZCDamageEvent = static_cast<const FZCDamageEvent*>(&DamageEvent);
-		ElementTag = ZCDamageEvent->ElementTag;
+
+		ElementInfo.ElementTag = ZCDamageEvent->ElementTag;
+		ElementInfo.Duration = ZCDamageEvent->ElementDuration;
+		ElementInfo.SpreadCount = ZCDamageEvent->ElementSpreadingCount;
 
 	}
 	else if (DamageEvent.IsOfType(FZCPointDamageEvent::ClassID))
 	{
 		const FZCPointDamageEvent* ZCPointDamageEvent = static_cast<const FZCPointDamageEvent*>(&DamageEvent);
-		ElementTag = ZCPointDamageEvent->ElementTag;
+
+		ElementInfo.ElementTag = ZCPointDamageEvent->ElementTag;
+		ElementInfo.Duration = ZCPointDamageEvent->ElementDuration;
+		ElementInfo.SpreadCount = ZCPointDamageEvent->ElementSpreadingCount;
 
 		// 데미지 정보, 컴포넌트 전달용
 		bIsCritial = IsCritialBone(GetMesh()->FindClosestBone(ZCPointDamageEvent->HitInfo.ImpactPoint));
@@ -197,7 +201,9 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 	{
 		const FZCRadialDamageEvent* ZCRadialDamageEvent = static_cast<const FZCRadialDamageEvent*>(&DamageEvent);
 
-		ElementTag = ZCRadialDamageEvent->ElementTag;
+		ElementInfo.ElementTag = ZCRadialDamageEvent->ElementTag;
+		ElementInfo.Duration = ZCRadialDamageEvent->ElementDuration;
+		ElementInfo.SpreadCount = ZCRadialDamageEvent->ElementSpreadingCount;
 
 		// 데미지 정보, 컴포넌트 전달용
 		HitResult = (ZCRadialDamageEvent->ComponentHits.Num() > 0) ? &ZCRadialDamageEvent->ComponentHits[0] : nullptr;
@@ -222,22 +228,31 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 		}
 	}
 
+	if (ActualDamage != 0.0f)
+	{
+		ReceiveAnyDamage(ActualDamage, DamageTypeCDO, EventInstigator, DamageCauser);
+		OnTakeAnyDamage.Broadcast(this, ActualDamage, DamageTypeCDO, EventInstigator, DamageCauser);
+		if (EventInstigator != nullptr)
+		{
+			EventInstigator->InstigatedAnyDamage(ActualDamage, DamageTypeCDO, this, DamageCauser);
+		}
+	}
+
 	// 스탯 컴포넌트에 데미지 전달
-	StateComponent->ApplyDamage(ActualDamage, ElementTag, DamageTypeTag, bIsCritial, false, *HitResult, DamageCauser);
-	// 데미지 전달(스탯컴포넌트에, 전달 값 : 데미지, 크리티컬 여부)
-	// 캐릭터가 죽었는지 확인
-	// 크리티컬 공격인지 확인(넉백 이루어짐)
-	// 그로기 수치에 도달했는지 확인(넉백 이루어짐)
-	// 히트 리액션 컴포넌트 전달(FHitResult, 공격 강도, 죽음 여부)
-
-
-	// 결과를 통해 일반 공격인 경우 리액션, (죽음, 크리티걸 공격 혹은 그로기 수치 도달에 의한 리액션은 델리게이트에 바인딩)
+	// 데미지, 원소 태그, 데미지 타입
+	ActualDamage = StateComponent->ApplyDamage(ActualDamage, ElementInfo, bIsCritial);
 
 	// 라이트		: 일반 공격
 	// 미디엄		: 약점 속성
 	// 헤비			: 크리티컬 공격
-	// 폭발			: 폭발 + 그로기 수치 도달
+	// 폭발			: 폭발 또는 그로기 수치 도달
 
+	EHitStrength HitStrength = EHitStrength::Light;
+	//if (StateComponent->ElementRelation(ElementTag) == -1) HitStrength = EHitStrength::Medium;
+	if (bIsCritial) HitStrength = EHitStrength::Heavy;
+	//if (DamageTypeTag == TAG_DamageType_Explosion || StateComponent->IsStaggerFull()) HitStrength = EHitStrength::Explosion;
+
+	//HitReactionComponent->PerformHitReaction(DamageCauser, *HitResult, HitStrength, StateComponent->IsDead(), false);
 
 	return ActualDamage;
 }

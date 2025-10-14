@@ -24,8 +24,8 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Bone, "Material.Bone");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Stone, "Material.Stone");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Ancient, "Material.Ancient");
 
-// Effect
-UE_DEFINE_GAMEPLAY_TAG(TAG_Effect_Burning, "Effect.Burning");
-UE_DEFINE_GAMEPLAY_TAG(TAG_Effect_Wet, "Effect.Wet");
-UE_DEFINE_GAMEPLAY_TAG(TAG_Effect_Frozen, "Effect.Frozen");
-UE_DEFINE_GAMEPLAY_TAG(TAG_Effect_Electrified, "Effect.Electrified");
+// Monster
+UE_DEFINE_GAMEPLAY_TAG(TAG_Monster_Goblin, "Monster.Goblin");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Monster_Lizardman, "Monster.Lizardman");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Monster_Centaur, "Monster.Centaur");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Monster_Ogre, "Monster.Ogre");

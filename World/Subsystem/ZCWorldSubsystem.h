@@ -9,6 +9,7 @@
 #include "Utils/Pool/ZCPoolingClass.h"
 #include "Engine/StreamableManager.h"
 #include "Gameplay/ChemistrySystem/ChemistrySystemTable.h"
+#include "Gameplay/ChemistrySystem/ChemistrySystemCharacterTable.h"
 #include "ZCWorldSubsystem.generated.h"
 
 class UNiagaraSystem;
@@ -93,28 +94,50 @@ private:
 
 	/*===================================================== 화학 반응 ==========================================================*/
 public:
-	bool TryGetOutCome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FReactionOut& Out) const;
+	bool TryGetObjectOutCome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FReactionOut& Out) const;
+	bool TryGetCharacterOutcome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FCharacterReactionOut& Out) const;
 
-	FORCEINLINE const FElementInstanceData* GetElementInstanceData(const FGameplayTag& Element) const
+	FORCEINLINE const FElementInstanceData* GetObjectElementInstanceData(const FGameplayTag& Element) const
 	{
-		return ElementMap.Find(Element);
+		return ObjectElementMap.Find(Element);
 	}
 
-	FORCEINLINE const FMaterialInstanceData* GetMaterialInstanceData(const FGameplayTag& Material) const
+	FORCEINLINE const FMaterialInstanceData* GetObjectMaterialInstanceData(const FGameplayTag& Material) const
 	{
-		return MaterialMap.Find(Material);
+		return ObjectMaterialMap.Find(Material);
+	}
+
+	FORCEINLINE const FCharacterElementInstanceData* GetCharacterElementInstanceData(const FGameplayTag& CElement) const
+	{
+		return CharacterElementMap.Find(CElement);
+	}
+
+	FORCEINLINE const FCharacterArmorTypeInstanceData* GetCharacterMonsterTypeInstanceData(const FGameplayTag& CMonster) const
+	{
+		return CharacterMonsterTypeMap.Find(CMonster);
 	}
 
 protected:
 	// 로드할 애셋들 
-	int32 PreLoadElementFX();
+	int32 PreLoadObjectElementFX();
+	int32 PreLoadCharacterElementFX();
 
 protected:
 	UPROPERTY(Transient)
-	TMap<FGameplayTag, FElementInstanceData> ElementMap;
+	TMap<FGameplayTag, FElementInstanceData> ObjectElementMap;
 
 	UPROPERTY(Transient)
-	TMap<FGameplayTag, FMaterialInstanceData> MaterialMap;
+	TMap<FGameplayTag, FMaterialInstanceData> ObjectMaterialMap;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, FCharacterElementInstanceData> CharacterElementMap;
+
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, FCharacterArmorTypeInstanceData> CharacterMonsterTypeMap;
+
+	// TODO : 플레이어 갑옷 로직
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, FCharacterArmorTypeInstanceData> PlayerArmorTypeMap;
 
 	UPROPERTY(Transient)
 	UZCChemistryGISubsystem* ChemistryGIS = nullptr;

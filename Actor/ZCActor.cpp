@@ -25,10 +25,16 @@ AZCActor::AZCActor()
 	MaterialStateComponent = CreateDefaultSubobject<UZCMaterialStateComponent>(TEXT("MaterialStateComponent"));
 }
 
+void AZCActor::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	MaterialStateComponent->SetUZCNiagaraComponent(NiagaraComponent);
+	MaterialStateComponent->SetCachedOwner(this);
+}
+
 float AZCActor::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	if (!bCanDamaged) return 0.0f;
-
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	FGameplayTag DamageTypeTag = FGameplayTag::EmptyTag;
@@ -96,7 +102,10 @@ float AZCActor::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 		}
 	}
 
-	MaterialStateComponent->ApplyElementExposure(ElementInfo);
+	if (bCanElementalReaction && ElementInfo.ElementTag != FGameplayTag::EmptyTag)
+	{
+		MaterialStateComponent->ApplyElementExposure(ElementInfo);
+	}
 
 	return ActualDamage;
 }

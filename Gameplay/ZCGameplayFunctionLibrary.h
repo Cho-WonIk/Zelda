@@ -5,44 +5,8 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Gameplay/GameplayTag/ZCGameplayTag.h"
+#include "ZCElementInfo.h"
 #include "ZCGameplayFunctionLibrary.generated.h"
-
-UENUM(BlueprintType)
-enum class EElementRel : uint8
-{
-	Weak	UMETA(DisplayName = "약점"),
-	Neutral	UMETA(DisplayName = "중립"),
-	Strong	UMETA(DisplayName = "강점"),
-};
-
-USTRUCT(BlueprintType)
-struct FElementInfo
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소"))
-	FGameplayTag ElementTag = FGameplayTag::EmptyTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "공격자 원소의 지속시간"))
-	float Duration = -1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "공격자 원소의 확산 카운트"))
-	int32 SpreadCount = -1;
-
-	FElementInfo() {}
-
-	FElementInfo(FGameplayTag InElementTag) : ElementTag(InElementTag) {}
-
-	FElementInfo(FGameplayTag InElementTag, float InDuration, int32 InSpreadCount)
-	{
-		ElementTag = InElementTag;
-		Duration = InDuration;
-		SpreadCount = InSpreadCount;
-	}
-
-	[[nodiscard]] const bool IsEmpty() const { return ElementTag == FGameplayTag::EmptyTag && Duration == -1.0f && SpreadCount == -1; }
-	[[nodiscard]] const bool IsNewElement() const { return Duration == -1.0f && SpreadCount == -1; }
-};
 
 UCLASS()
 class ZELDA_API UZCGameplayFunctionLibrary : public UBlueprintFunctionLibrary
@@ -101,14 +65,4 @@ public:
 
 	static bool ApplyRadialDamageWithFalloff(FElementInfo& ElementInfo, const UObject* WorldContextObject, float BaseDamage, float MinimumDamage, const FVector& Origin, float DamageInnerRadius, float DamageOuterRadius, float DamageFalloff, TSubclassOf<class UZCDamageType> DamageTypeClass, const TArray<AActor*>& IgnoreActors, AActor* DamageCauser = nullptr, AController* InstigatedByController = nullptr, ECollisionChannel DamagePreventionChannel = ECC_Visibility);
 
-	/** 데미지를 계산합니다.
-	* @param BaseDamage			기본 피해량.
-	* @param ElementRelation	원소 속성의 약점, 중립, 강점 관계
-	* @parm  bIsCriticalBone	약점 부위 피격 여부
-	* @parm	 ArmorState			피격자의 방어력
-	* 
-	* @return FinalDamage		계산된 최종 피해량
-	*/
-	UFUNCTION(BlueprintCallable, Category = "ZCGameplay|Damage")
-	static float CalculateDamage(float BaseDamage, EElementRel ElementResult = EElementRel::Neutral, bool IsCriticalBone = false, float ArmorState = 0.0f);
 };

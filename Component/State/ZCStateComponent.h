@@ -5,8 +5,106 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Gameplay/GameplayTag/ZCGameplayTag.h"
-
+#include "Gameplay/ChemistrySystem/ChemistrySystemCharacterTable.h"
 #include "ZCStateComponent.generated.h"
+
+USTRUCT(BlueprintType)
+struct FCharacterElementState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGameplayTag ElementTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Duration = -1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 SpreadingCount = -1;
+
+	// 데미지 단발성 <-> 지속성
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "데미지 지속성"))
+	bool bIsDamageOnce = false;
+
+	// 원소 초기 데미지
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage", meta = (DisplayName = "원소 초기 데미지"))
+	float ElementFirstDamage;
+
+	// 원소 틱 데미지
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 틱 데미지"))
+	float ElementTickDamage = 0.0f;
+
+	// 쿨타임
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float TimeRemaining = -1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "경직 여부"))
+	bool bStiffness;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "마찰력이 없어지는 지 여부"))
+	bool bfriction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Force", meta = (DisplayName = "힘이 가해지는 지 여부"))
+	bool bApplyForce;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Force", meta = (DisplayName = "힘이 가해지는 힘의 크기"))
+	float Force;
+
+	static const FCharacterElementState Empty;
+
+	[[nodiscard]] FORCEINLINE bool IsEmpty() const { return Duration == -1.0f && SpreadingCount == -1; }
+
+	void Reset() { *this = Empty; }
+
+	FCharacterElementState() : ElementTag(FGameplayTag::EmptyTag), Duration(-1.0f), SpreadingCount(-1), TimeRemaining(-1.0f) {}
+	FCharacterElementState(const FGameplayTag& InElementTag, float InDuration, int32 InPropagationCount) : ElementTag(InElementTag), Duration(InDuration), SpreadingCount(InPropagationCount), TimeRemaining(InDuration)
+	{
+		bIsDamageOnce = false;
+		ElementTickDamage = 0.0f;
+		SpreadingCount = -1;
+		ElementFirstDamage = 0.0f;
+		bStiffness = false;
+		bfriction = false;
+
+		bApplyForce = false;
+
+		Force = 0.0f;
+	}
+
+	void InitFromOut(const FCharacterReactionOut& ReactionResult, const int32& InSpreadingCount)
+	{
+		ElementTag = ReactionResult.Tag;
+		Duration = ReactionResult.Duration;
+		bIsDamageOnce = ReactionResult.bIsDamageOnce;
+		ElementTickDamage = ReactionResult.TickDamage;
+
+		SpreadingCount = InSpreadingCount;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FCharacterArmorState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "방어력"))
+	float ArmorState;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "약점 속성"))
+	TSet<FGameplayTag> WeakTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "강점 속성"))
+	TSet<FGameplayTag> StrongTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "면역 속성"))
+	TSet<FGameplayTag> ImmutTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 임계값"))
+	TMap< FGameplayTag, float> Threshold;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 변화량"))
+	TMap< FGameplayTag, float> ThresholdDelta;
+};
 
 USTRUCT(BlueprintType)
 struct FZCStat
@@ -41,18 +139,29 @@ public:
 	float GetNormalized() const { return (Max > 0.0f) ? Current / Max : 0.0f; }
 };
 
+
+USTRUCT(BlueprintType)
+struct FZCStagger
+{
+	GENERATED_BODY()
+
+	// 피격 그로기 수치
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "피격 그로기"))
+	FZCStat DamageStagger;
+
+	// CC기 그로기 수치
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "CC기 그로기"))
+	FCharacterElementState CCStagger;
+};
+
+class UZCWorldSubsystem;
+class UZCNiagaraComponent;
+struct FElementInfo;
+class AZCCharacter;
+
 DECLARE_MULTICAST_DELEGATE_OneParam(FZCStatChangedDelegate, const FZCStat&);
 
-// Hit 이벤트 델리게이트
-// HitCauser: Hit를 발생시킨 Actor
-// HitResult: Hit의 결과 정보
-// Enum As Byte: Hit의 강도 (예: 약한 공격, 강한 공격 등)
-// UseCauseDeath: Hit이 사망을 유발하는지 여부
-// UseHitCurserDirection: HitCauser의 방향을 사용할지 여부
-DECLARE_MULTICAST_DELEGATE_FiveParams(FZCHitDelegate, const AActor* /*HitCauser*/, const FHitResult& /*HitResult*/, const uint8 /*Enum As Byte, InputHitStrength*/ , const bool /*UseCauseDeath*/, const bool /*UseHitCurserDirection*/);
-
-DECLARE_MULTICAST_DELEGATE(FZCStatZeroDelegate);
-DECLARE_MULTICAST_DELEGATE(FZCStatFullDelegate);
+DECLARE_MULTICAST_DELEGATE(FZCStatDelegate);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZELDA_API UZCStateComponent : public UActorComponent
@@ -67,65 +176,79 @@ public:
 public:
 	FZCStatChangedDelegate OnHealthChanged;
 
-	FZCStatZeroDelegate OnHealthZero;
-	FZCStatFullDelegate OnStaggerFull;
+	FZCStatDelegate OnHealthZero;
+	FZCStatDelegate OnStaggerFull;
 
-	FZCHitDelegate OnHit;
+	//FZCHitDelegate OnHit;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
+	virtual void InitializeComponent() override;
+	
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	// Getter, Setter함수
 public:
-	//virtual void AddTag(const FGameplayTagContainer& Tags);
-	//virtual void AddTag(const FGameplayTag& Tag);
-	//virtual void RemoveTag(const FGameplayTagContainer& Tags);
-	//virtual void RemoveTag(const FGameplayTag& Tag);
-	virtual void ApplyDamage(float DamageAmount, const FGameplayTag& ElementTag, const FGameplayTag& DamageTypeTag, bool IsCritialBone, bool UseHitCuaserDirection, const FHitResult& HitResult, const AActor* HitCauser);
-	//virtual void ApplyDamage(float DamageAmount, const FGameplayTag& DamageTypeTag, const FGameplayTag& ElementTag, bool IsCriticalBone);
+
+public:
+	virtual float ApplyDamage(float DamageAmount, const FElementInfo& NewElementInfo, bool IsCritical);
+	
+	virtual void ApplyStagger(float AddStagger, const FElementInfo& NewElementInfo);
 
 	bool IsDead() const { return Health.IsZero(); }
-	bool IsStaggerFull() const { return Stagger.IsFull(); }
+
+	void SetVFXComponent(UZCNiagaraComponent* VFXComp) { VFXComponent = VFXComp; }
+	void SetOwnerCharacter(AZCCharacter* COwner) { OwnerCharacter = COwner; }
 
 protected:
-	//// Health 관련 함수
-	//void ApplyHeal(float HealAmount);
+	virtual float CalculDamage(float DamageAmount, const FGameplayTag& ElementTag, bool IsCritical);
 
-	//// 그로기 관련 함수
-	//void AddStaggerGauge(float Value);
+protected:
+	virtual void ApplyCCElement(const FCharacterReactionOut& ReactionResult, const int32& SpreadingCount);
+	
+	void ProcessElementSpreading();
 
-	//void UpdateStagger(float DeltaTime);
+private:
+	void CCElementFX(bool bEnabled);
 
 protected:
 	// HP
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "State", meta = (DisplayName = "체력"))
 	FZCStat Health;
 
-	// 그로기 수치
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "State", meta = (DisplayName = "그로기"))
-	FZCStat Stagger;
+	// 그로기 및 CC기
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "State", meta = (DisplayName = "그로기 및 CC기"))
+	FZCStagger Stagger;
 
-	// 방어력
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "State", meta = (DisplayName = "방어력"))
-	float ArmorState = 0.0f;
-	
-	// 그로기 감소 시작 시간
-	UPROPERTY(EditAnywhere, Category = "State|그로기", meta = (DisplayName = "그로기 감소 시작 시간"))
-	float StaggerDecayAmount = 1.0f;
+	// 방어력, 몬스터의 경우 몬스터 속성이 적용됨
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State", meta = (DisplayName = "방어력"))
+	FCharacterArmorState Armor;
 
-	// 그로기 감소량
-	UPROPERTY(EditAnywhere, Category = "State|그로기", meta = (DisplayName = "그로기 감소량"))
-	float StaggerDecayRate = 0.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "현재 원소 값"))
+	TMap<FGameplayTag, float> CurrentThreshold;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "캐릭터 태그"))
+	FGameplayTag CharacterTag;
+
+	// CC기 : 스턴, 마찰, 틱데미지 유무
+	/*
+	* 모든 지속시간은 Duration에 따라 달라짐
+	* 틱 데미지는 bIsTickableDamage에 따라 달라짐
+	* 경직은 bStiffness으로 달라짐
+	* 마찰력 유무는 bfriction
+	* 힘 여부 bfriction
+	* 
+	*/
 
 protected:
-	FGameplayTagContainer Tags;
+	class UZCWorldSubsystem* WorldSubsystem = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = State)//, meta = (GameplayTagFilter = "Element"))
-	FGameplayTag WeakElementTag;// = Element::None; // 약점 속성 태그
+	class UZCNiagaraComponent* VFXComponent;
 
-private:
-	bool bCanDecreaseStagger = false;
-	FTimerHandle StaggerDecayTimer;
+	const FCharacterElementInstanceData* ElementData;
+
+	class AZCCharacter* OwnerCharacter = nullptr;
 };

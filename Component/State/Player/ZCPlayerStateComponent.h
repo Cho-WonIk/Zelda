@@ -18,13 +18,4 @@ public:
 	UZCPlayerStateComponent();
 
 protected:
-	// 방어구
-	FGameplayTagContainer ArmorTags;
-
-	// 버프
-	FGameplayTag BuffTag;
-
-	// 환경
-	FGameplayTag StatusTags;
-
 };

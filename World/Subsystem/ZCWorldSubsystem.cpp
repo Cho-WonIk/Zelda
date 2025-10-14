@@ -20,7 +20,24 @@ void UZCWorldSubsystem::PostInitialize()
 		ChemistryGIS = &UZCChemistryGISubsystem::Get(this);
 
 		TotalAssetCount = 1;
-		PreLoadElementFX();
+		PreLoadObjectElementFX();
+		PreLoadCharacterElementFX();
+
+		for (const auto& M : ChemistryGIS->GetObjectMaterialMap())
+		{
+			FMaterialInstanceData NewMaterial;
+			NewMaterial.InitFromCDO(M.Value);
+
+			ObjectMaterialMap.Add(M.Key, NewMaterial);
+		}
+
+		for (const auto& C : ChemistryGIS->GetCharacterTypeMap())
+		{
+			FCharacterArmorTypeInstanceData NewMonster;
+			NewMonster.InitFromMonsterCDO(C.Value);
+
+			CharacterMonsterTypeMap.Add(C.Key, NewMonster);
+		}
 	}
 
 }
@@ -152,18 +169,18 @@ void UZCWorldSubsystem::RemoveItemFromPool(const EItemType Type, int32 Index)
 	}
 }
 
-int32 UZCWorldSubsystem::PreLoadElementFX()
+int32 UZCWorldSubsystem::PreLoadObjectElementFX()
 {
 	if (!ChemistryGIS) return -1;
 
 	TArray<const FElementCDO*> Rows;
-	ChemistryGIS->GetAllElementCDOs(Rows);
+	ChemistryGIS->GetAllObjectElementCDOs(Rows);
 
 	if (Rows.Num() == 0) return -1;
 
 	TArray<FSoftObjectPath> Arr;
 
-	for (const FElementCDO* CDO : Rows)
+	for (const auto &CDO : Rows)
 	{
 		if (!CDO) continue;
 
@@ -175,15 +192,48 @@ int32 UZCWorldSubsystem::PreLoadElementFX()
 
 		Arr.Add(CDO->EndVFX.ToSoftObjectPath());
 		Arr.Add(CDO->EndSFX.ToSoftObjectPath());
-		//LoadPackForTag(CDO->Tag, *CDO);
 	}
 
 	return StreamableHandleArr.Add(PreLoadAsset(Arr));
 }
 
-bool UZCWorldSubsystem::TryGetOutCome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FReactionOut& Out) const
+int32 UZCWorldSubsystem::PreLoadCharacterElementFX()
 {
-	const FReactionOut* Found = ChemistryGIS->FindReaction(FReactionKey{SourceTag, TargetTag});
+	if (!ChemistryGIS) return -1;
+
+	TArray<const FCharacterElementCDO*> Rows;
+	ChemistryGIS->GetAllCharacterElementCDOs(Rows);
+
+	if (Rows.Num() == 0) return -1;
+
+	TArray<FSoftObjectPath> Arr;
+
+	for (const auto &CDO : Rows)
+	{
+		if (!CDO) continue;
+
+		Arr.Add(CDO->ElementMaterial.ToSoftObjectPath());
+		Arr.Add(CDO->VFX.ToSoftObjectPath());
+		Arr.Add(CDO->SFX.ToSoftObjectPath());
+	}
+
+	return StreamableHandleArr.Add(PreLoadAsset(Arr));
+}
+
+bool UZCWorldSubsystem::TryGetObjectOutCome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FReactionOut& Out) const
+{
+	const FReactionOut* Found = ChemistryGIS->FindObjectReaction(FReactionKey{SourceTag, TargetTag});
+	if (Found)
+	{
+		Out = *Found;
+		return true;
+	}
+	return false;
+}
+
+bool UZCWorldSubsystem::TryGetCharacterOutcome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FCharacterReactionOut& Out) const
+{
+	const FCharacterReactionOut* Found = ChemistryGIS->FindCharacterReaction(FCharacterReactionKey{SourceTag, TargetTag});
 	if (Found)
 	{
 		Out = *Found;
@@ -207,34 +257,20 @@ void UZCWorldSubsystem::OnAssetLoadComplete()
 
 	if (CompletedLoadingAssetCount >= TotalAssetCount)
 	{
-		for (const auto &M : ChemistryGIS->GetMaterialMap())
-		{
-			FMaterialInstanceData NewMaterial;
-			NewMaterial.Threshold = M.Value->Threshold;
-			NewMaterial.ThresholdDelta = M.Value->ThresholdDelta;
-
-			MaterialMap.Add(M.Key, NewMaterial);
-
-			UZCLogger::Warning(TEXT("물질 애셋 로딩 중"));
-		}
-
-		for (const auto &E : ChemistryGIS->GetElementMap())
+		for (const auto &E : ChemistryGIS->GetObjectElementMap())
 		{
 			FElementInstanceData NewElement;
+			NewElement.InitFromCDO(E.Value);
 
-			NewElement.StartSFX = E.Value->StartSFX.Get();
-			NewElement.StartVFX = E.Value->StartVFX.Get();
+			ObjectElementMap.Add(E.Key, NewElement);
+		}
 
-			NewElement.LoopSFX = E.Value->LoopSFX.Get();
-			NewElement.LoopVFX = E.Value->LoopVFX.Get();
+		for (const auto &E : ChemistryGIS->GetCharacterElementMap())
+		{
+			FCharacterElementInstanceData NewElement;
+			NewElement.InitFromCDO(E.Value);
 
-			NewElement.EndSFX = E.Value->EndSFX.Get();
-			NewElement.EndVFX = E.Value->EndVFX.Get();
-
-			NewElement.MaxSpreadingCount = E.Value->MaxSpreadingCount;
-			NewElement.SpreadingRange = E.Value->SpreadingRange;
-
-			ElementMap.Add(E.Key, NewElement);
+			CharacterElementMap.Add(E.Key, NewElement);
 		}
 
 		OnAssetLoadFinished.Broadcast();

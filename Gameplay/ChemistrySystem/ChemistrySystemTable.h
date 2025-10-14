@@ -7,6 +7,8 @@
 #include "NiagaraSystem.h"
 #include "ChemistrySystemTable.generated.h"
 
+/*================= 원소와 물체간의 상호작용 =================*/
+
 USTRUCT(BlueprintType)
 struct FMaterialCDO : public FTableRowBase
 {
@@ -23,6 +25,10 @@ struct FMaterialCDO : public FTableRowBase
 	// 원소별 임계치
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "임계값", GameplayTagFilter = "Element"))
 	TMap<FGameplayTag, float> Threshold;
+
+	// 물질의 내구도
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "내구도"))
+	float Durability;
 };
 
 USTRUCT(BlueprintType)
@@ -40,7 +46,11 @@ struct FElementCDO : public FTableRowBase
 
 	// 확산 범위
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 범위"))
-	float SpreadingRange = 0;
+	float SpreadingRange = 0.0f;
+
+	// 원소가 주변에 확산될 때 주는 데미지, 0.0일 경우 데미지 전달은 없고 확산만 일어남
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 데미지"))
+	float Damage = 0.0f;
 
 	/*==== FX ====*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX", meta = (DisplayName = "지속되는 VFX"))
@@ -60,10 +70,6 @@ struct FElementCDO : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SFX", meta = (DisplayName = "끝 SFX"))
 	TSoftObjectPtr<USoundBase> EndSFX;
-
-
-	/*==== 머티리얼 ====*/
-	TSoftObjectPtr<class UMaterialInterface> OverlayMaterial;
 };
 
 USTRUCT(BlueprintType)
@@ -77,17 +83,17 @@ struct FReactionOut
 
 	// 데미지 단발성 <-> 지속성
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "데미지 지속성"))
-	bool bIsDamageOnce = false;
+	bool bIsDamageOnce = true;
 
-	// 원소 초기 데미지
+	// 액터가 입는 원소 초기 데미지
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 초기데미지"))
 	float ElementFirstDamage = 0.0f;
 
-	// 원소 틱 데미지
+	// 액터가 입는 원소 틱 데미지
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 틱 데미지"))
 	float ElementTickDamage;
 
-	// 원소 지속시간
+	// 원소 지속시간, -1.0f인경우 무한이 지속
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "지속시간", ToolTip = "원소 지속 시간"))
 	float Duration = 0.0f;
 };
@@ -145,6 +151,25 @@ struct FElementInstanceData
 
 	// 확산 범위
 	float SpreadingRange = 0;
+
+	// 주변에 주는 데미지
+	float Damage = 0.0f;
+
+	void InitFromCDO(const FElementCDO* InCDO)
+	{
+		StartVFX = InCDO->StartVFX.Get();
+		LoopVFX = InCDO->LoopVFX.Get();
+		EndVFX = InCDO->EndVFX.Get();
+
+		StartSFX = InCDO->StartSFX.Get();
+		LoopSFX = InCDO->LoopSFX.Get();
+		EndSFX = InCDO->EndSFX.Get();
+
+		MaxSpreadingCount = InCDO->MaxSpreadingCount;
+		SpreadingRange = InCDO->SpreadingRange;
+
+		Damage = InCDO->Damage;
+	}
 };
 
 USTRUCT()
@@ -157,4 +182,14 @@ struct FMaterialInstanceData
 
 	// 원소별 임계치
 	UPROPERTY(Transient) TMap<FGameplayTag, float> Threshold;
+
+	// 물질의 내구도
+	UPROPERTY(Transient) float Durability;
+
+	void InitFromCDO(const FMaterialCDO* InCDO)
+	{
+		Threshold = InCDO->Threshold;
+		ThresholdDelta = InCDO->ThresholdDelta;
+		Durability = InCDO->Durability;
+	}
 };
