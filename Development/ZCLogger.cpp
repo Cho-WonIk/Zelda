@@ -26,6 +26,11 @@ FString UZCLogger::ToString(const float Value)
 	return FString::SanitizeFloat(Value);
 }
 
+FString UZCLogger::ToString(const double Value)
+{
+	return FString::SanitizeFloat(Value);
+}
+
 FString UZCLogger::ToString(const bool Value)
 {
 	return Value ? TEXT("true") : TEXT("false");

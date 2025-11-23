@@ -5,6 +5,7 @@
 #include "EnhancedInputComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
 #include "MotionWarpingComponent.h"
 #include "Component/LockOn/ZCLockSpringArmComponent.h"
 #include "Component/Climb/ZCCharacterMovementComponent.h"
@@ -18,6 +19,10 @@
 #include "World/Subsystem/ZCWorldSubsystem.h"
 
 #include "Utils/Team/ZCTeam.h"
+
+#include "Actor/ZCActor.h"
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCPlayerCharacter)
 
 namespace PlayerInputType
 {
@@ -61,6 +66,15 @@ AZCPlayerCharacter::AZCPlayerCharacter(const FObjectInitializer& ObjectInitializ
 	GlideMeshComponent->SetupAttachment(GetMesh(), BoneSocket::Glide::Holster);
 	GlideMeshComponent->SetRelativeScale3D(FVector(0.1f));
 
+	HighlightArea = CreateDefaultSubobject<USphereComponent>(TEXT("HighlightArea"));
+	HighlightArea->InitSphereRadius(1000.0f);
+	HighlightArea->SetupAttachment(RootComponent);
+	HighlightArea->SetCollisionProfileName(Zelda::Profile::HighlightArea);
+	HighlightArea->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+	HighlightArea->OnComponentBeginOverlap.AddDynamic(this, &AZCPlayerCharacter::OnEnterHighlightRange);
+	HighlightArea->OnComponentEndOverlap.AddDynamic(this, &AZCPlayerCharacter::OnExitHighlightRange);
+
 	ZCCharacterMovementComponent = ExactCast<UZCCharacterMovementComponent>(GetCharacterMovement());
 	ZCPlayerStateComponent = ExactCast<UZCPlayerStateComponent>(GetStateComponent());
 
@@ -70,6 +84,8 @@ AZCPlayerCharacter::AZCPlayerCharacter(const FObjectInitializer& ObjectInitializ
 void AZCPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	ZCPlayerController = CastChecked<AZCPlayerController>(GetController());
 }
 
 void AZCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -79,36 +95,39 @@ void AZCPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AZCPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		// L스틱 입력
+		// 이동 액션
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::Move);
-		// R스틱 입력
+		
+		// 카메라 액션
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::Look);
 
-		// Y버튼 입력
+		// 점프 액션
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AZCPlayerCharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AZCPlayerCharacter::StopJumping);
 
-		// X버튼 입력
+		// 공격 액션
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AZCPlayerCharacter::StartAttack);
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Canceled, this, &AZCPlayerCharacter::NormalAttack);
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::AttackCharging);
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Completed, this, &AZCPlayerCharacter::HoldAttack);
 
-		// B버튼 입력
-		EnhancedInputComponent->BindAction(InteraactionAction, ETriggerEvent::Started, this, &AZCPlayerCharacter::Interaction);
+		// 패리 액션
+		EnhancedInputComponent->BindAction(ParryAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::StartParry);
 
-		// A버튼 입력
+		// 달리기 액션
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, this, &AZCPlayerCharacter::StartRunning);
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::Running);
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &AZCPlayerCharacter::StopRunning);
 
-		// LT버튼 입력
+		// 주목 액션
 		EnhancedInputComponent->BindAction(AttentionAction, ETriggerEvent::Started, this, &AZCPlayerCharacter::StartAttention);
 		EnhancedInputComponent->BindAction(AttentionAction, ETriggerEvent::Completed, this, &AZCPlayerCharacter::StopAttention);
 
-		// LS버튼 입력
+		// 웅크리기 액션
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Triggered, this, &AZCPlayerCharacter::ToggleCrouch);
 	}
 }
@@ -202,18 +221,31 @@ void AZCPlayerCharacter::OnMovementChange(const EMovementMode NewMovementMode, c
 
 void AZCPlayerCharacter::OnCanClimbDownCliff(const bool bDownCliff)
 {
-	if (AZCPlayerController* ZCPlayerController = Cast<AZCPlayerController>(GetController()))
+	if (bDownCliff)
 	{
-		if (bDownCliff)
-		{
-			ZCPlayerController->AddInteractionEvent(EFaceButtonEvent::ClimbDown);
-			bCanClimbDownCliff = true;
-		}
-		else
-		{
-			ZCPlayerController->RemoveInteractionEvent(EFaceButtonEvent::ClimbDown);
-			bCanClimbDownCliff = false;
-		}
+		ZCPlayerController->AddInteractionEvent(EFaceButtonEvent::ClimbDown);
+		bCanClimbDownCliff = true;
+	}
+	else
+	{
+		ZCPlayerController->RemoveInteractionEvent(EFaceButtonEvent::ClimbDown);
+		bCanClimbDownCliff = false;
+	}
+}
+
+void AZCPlayerCharacter::OnEnterHighlightRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (AZCActor* Item = Cast<AZCActor>(OtherActor))
+	{
+		Item->RequestOverlayState(EOverlayState::ItemHighlight);
+	}
+}
+
+void AZCPlayerCharacter::OnExitHighlightRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (AZCActor* Item = Cast<AZCActor>(OtherActor))
+	{
+		Item->ReleaseOverlayState(EOverlayState::ItemHighlight);
 	}
 }
 
@@ -269,6 +301,9 @@ void AZCPlayerCharacter::Look(const FInputActionValue& Value)
 
 void AZCPlayerCharacter::Jump()
 {
+	ZCPlayerController->RemoveInteractionEvent(EFaceButtonEvent::ClimbDown);
+	bCanClimbDownCliff = false;
+
 	EZCDirection CurrentDirection = GetInputDirection();
 	if (bIsCrouched)
 	{
@@ -441,23 +476,12 @@ void AZCPlayerCharacter::FinishAttack()
 	AttackChargingGauge = 0;
 }
 
-void AZCPlayerCharacter::Interaction()
+void AZCPlayerCharacter::StartParry()
 {
-	// 주목상태이고, 방패가 있고 방패를 장착 중이면 패링 가능
 	if (bIsAttentionTriggered && CurrentShield != nullptr && bIsEquipShield)
 	{
 		// 무기 패링
 		PlayAnimMontage(ParryMontage);
-	}
-	else if (bCanClimbDownCliff)
-	{
-		// 절벽에서 내려가기
-		MotionWarpingComponent->AddOrUpdateWarpTargetFromLocation(MotionWarping::WarpTarget::ClimbDownTarget, ZCCharacterMovementComponent->GetClimbClimbDownSurface());
-		ZCCharacterMovementComponent->TryClimbDownCliff();
-	}
-	else
-	{
-		Cast<AZCPlayerController>(GetController())->FaceButtonRight();
 	}
 }
 
@@ -529,6 +553,13 @@ void AZCPlayerCharacter::StopAttention()
 void AZCPlayerCharacter::ToggleCrouch()
 {
 	bIsCrouched ? UnCrouch() : Crouch();
+}
+
+void AZCPlayerCharacter::ClimbDownCliff()
+{
+	// 절벽에서 내려가기
+	MotionWarpingComponent->AddOrUpdateWarpTargetFromLocation(MotionWarping::WarpTarget::ClimbDownTarget, ZCCharacterMovementComponent->GetClimbClimbDownSurface());
+	ZCCharacterMovementComponent->TryClimbDownCliff();
 }
 
 /*==================입력 버퍼===================*/

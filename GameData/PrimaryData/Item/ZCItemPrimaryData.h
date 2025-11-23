@@ -3,19 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameData/PrimaryData/ZCPrimaryDataAsset.h"
+#include "GameData/PrimaryData/ZCActorPrimaryDataAsset.h"
 #include "ZCItemPrimaryData.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class ZELDA_API UZCItemPrimaryData : public UZCPrimaryDataAsset
+class ZELDA_API UZCItemPrimaryData : public UZCActorPrimaryDataAsset
 {
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mesh")
-	TSoftObjectPtr<UStaticMesh> Mesh;
-
+	virtual EZCPrimaryAssetType GetZCPrimaryAssetType() const { return EZCPrimaryAssetType::Item; }
 };

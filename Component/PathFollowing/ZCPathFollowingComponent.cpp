@@ -26,6 +26,8 @@ namespace Zelda::Debug::Navigation
 }
 #endif
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCPathFollowingComponent)
+
 UZCPathFollowingComponent::UZCPathFollowingComponent()
 {
 }

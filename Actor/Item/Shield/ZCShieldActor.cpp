@@ -4,7 +4,9 @@
 #include "Actor/Item/Shield/ZCShieldActor.h"
 #include "Physics/ZCCollision.h"
 
-AZCShieldActor::AZCShieldActor()
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCShieldActor)
+
+AZCShieldActor::AZCShieldActor(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
@@ -13,11 +15,10 @@ void AZCShieldActor::PostInitializeComponents()
 	Super::PostInitializeComponents();
 }
 
-void AZCShieldActor::Initialize(FZCItemTable* NewItem)
+void AZCShieldActor::Initialize(FZCActorTable* NewItem)
 {
 	Super::Initialize(NewItem);
-	if (Info->Type == EItemType::Shield)
-	{
-		ShieldInfo = static_cast<FZCShieldTable*>(Info);
-	}
+	if (ItemInfo->ItemType != EItemType::Shield) return;
+
+	ShieldInfo = static_cast<FZCShieldTable*>(Info);
 }

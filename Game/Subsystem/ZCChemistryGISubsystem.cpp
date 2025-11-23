@@ -6,6 +6,8 @@
 #include "Physics/ZCCollision.h"
 #include "Development/ZCLogger.h"
 
+#include "Game/ZCGameInstance.h"
+
 UZCChemistryGISubsystem& UZCChemistryGISubsystem::Get(const UObject* Context)
 {
 	check(Context);
@@ -17,15 +19,6 @@ void UZCChemistryGISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Super::Initialize(Collection);
 
 	// 데이터 테이블 로드
-
-	ObjectElementTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_ElementCDO.DT_ElementCDO")));
-	ObjectMaterialTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_MaterialCDO.DT_MaterialCDO")));
-	ObjectReactionTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_Reaction.DT_Reaction")));
-
-	CharacterElementTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_CharacterElementCDO.DT_CharacterElementCDO")));
-	CharacterTypeTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_CharacterMonsterTypeCDO.DT_CharacterMonsterTypeCDO")));
-	CharacterReactionTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/Gameplay/Chemistry/DT_CharacterReaction.DT_CharacterReaction")));
-
 	ConvertObjectTableToMapRules();
 	ConvertCharacterTableToMapRules();
 }
@@ -40,14 +33,6 @@ void UZCChemistryGISubsystem::Deinitialize()
 	CharacterType.Reset();
 	CharacterRule.Reset();
 
-	ObjectElementTable = nullptr;
-	ObjectMaterialTable = nullptr;
-	ObjectReactionTable = nullptr;
-
-	CharacterElementTable = nullptr;
-	CharacterTypeTable = nullptr;
-	CharacterReactionTable = nullptr;
-
 	Super::Deinitialize();
 }
 
@@ -57,33 +42,37 @@ void UZCChemistryGISubsystem::ConvertObjectTableToMapRules()
 	ObjectMaterial.Reset();
 	ObjectElement.Reset();
 
+	UZCGameInstance* ZCGameInstance = Cast<UZCGameInstance>(GetGameInstance());
+
+	const UDataTable * const ObjectReactionTable = ZCGameInstance->GetObjectReactionTable();
 	if (ObjectReactionTable)
 	{
 		TArray<FReactionRuleRow*> Rows;
 		ObjectReactionTable->GetAllRows(TEXT("Chemistry ReactionRow"), Rows);
 
-		for (const auto &R : Rows)
+		for (const auto& R : Rows)
 		{
 			const FReactionKey K{ R->SourceTag, R->TargetTag };
 			ObjectRule.Add(K, &R->Outcome);
 		}
 
-		//UZCLogger::Warning(TEXT("Reaction Table 로드 완료"));
+		UZCLogger::Warning(TEXT("Reaction Table 로드 완료"));
 	}
 
+	const UDataTable * const ObjectMaterialTable = ZCGameInstance->GetObjectMaterialTable();
 	if (ObjectMaterialTable)
 	{
 		TArray<FMaterialCDO*> Rows;
 		ObjectMaterialTable->GetAllRows(TEXT("Chemistry Material CDO"), Rows);
 
-		for (const auto &R : Rows)
+		for (const auto& R : Rows)
 		{
 			ObjectMaterial.Add(R->Tag, R);
 		}
-		//UZCLogger::Warning(TEXT("Material Table 로드 완료"));
-
+		UZCLogger::Warning(TEXT("Material Table 로드 완료"));
 	}
 
+	const UDataTable * const ObjectElementTable = ZCGameInstance->GetObjectElementTable();
 	if (ObjectElementTable)
 	{
 		TArray<FElementCDO*> Rows;
@@ -93,7 +82,7 @@ void UZCChemistryGISubsystem::ConvertObjectTableToMapRules()
 		{
 			ObjectElement.Add(R->Tag, R);
 		}
-		//UZCLogger::Warning(TEXT("Element Table 로드 완료"));
+		UZCLogger::Warning(TEXT("Element Table 로드 완료"));
 	}
 }
 
@@ -103,6 +92,9 @@ void UZCChemistryGISubsystem::ConvertCharacterTableToMapRules()
 	CharacterElement.Reset();
 	CharacterType.Reset();
 
+	UZCGameInstance* ZCGameInstance = Cast<UZCGameInstance>(GetGameInstance());
+
+	const UDataTable * const CharacterReactionTable = ZCGameInstance->GetCharacterReactionTable();
 	if (CharacterReactionTable)
 	{
 		TArray<FCharacterReactionRuleRow*> Rows;
@@ -116,6 +108,7 @@ void UZCChemistryGISubsystem::ConvertCharacterTableToMapRules()
 		UZCLogger::Warning(TEXT("CharacterReactionTable 로드 완료"));
 	}
 
+	const UDataTable* const CharacterTypeTable = ZCGameInstance->GetCharacterTypeTable();
 	if (CharacterTypeTable)
 	{
 		TArray<FCharacterMonsterTypeCDO*> Rows;
@@ -128,6 +121,7 @@ void UZCChemistryGISubsystem::ConvertCharacterTableToMapRules()
 		UZCLogger::Warning(TEXT("CharacterTypeTable 로드 완료"));
 	}
 
+	const UDataTable* const CharacterElementTable = ZCGameInstance->GetCharacterElementTable();
 	if (CharacterElementTable)
 	{
 		TArray<FCharacterElementCDO*> Rows;

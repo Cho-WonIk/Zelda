@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "GameData/ZCItemTable.h"
-#include "Struct/Struct/ZCItemStruct.h"
+#include "GameData/Table/ZCItemTable.h"
+#include "GameData/Struct/ZCItemStruct.h"
 #include "ZCItemListObject.generated.h"
 
 /**

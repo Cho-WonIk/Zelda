@@ -22,6 +22,8 @@ namespace Zelda::Debug::AI
 }
 #endif
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCAIPerceptionComponent)
+
 UZCAIPerceptionComponent::UZCAIPerceptionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;

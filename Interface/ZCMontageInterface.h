@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCMontageInterface.generated.h"
 
 // This class does not need to be modified.

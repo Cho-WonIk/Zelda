@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/SceneComponent.h"
 #include "Actor/Item/ZCItemActor.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCItemSpawnComponent.generated.h"
 
 

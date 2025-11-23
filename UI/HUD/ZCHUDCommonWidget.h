@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonUserWidget.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCHUDCommonWidget.generated.h"
 
 class AZCPlayerController;

@@ -3,15 +3,14 @@
 
 #include "Component/State/ZCStateComponent.h"
 #include "Gameplay/ZCGameplayFunctionLibrary.h"
-#include "Development/ZCDebug.h"
 #include "Component/Reaction/Struct/ZCReactionEnum.h"
 #include "World/Subsystem/ZCWorldSubsystem.h"
 #include "Development/ZCLogger.h"
 #include "Component/VFX/ZCNiagaraComponent.h"
 #include "Character/ZCCharacter.h"
-
-const FCharacterElementState FCharacterElementState::Empty = FCharacterElementState(FGameplayTag::EmptyTag, -1.0f, -1);
-
+#include "Gameplay/Damage/ZCDamage.h"
+#include "Physics/ZCShape.h"
+#include "Development/ZCDebug.h"
 #if !UE_BUILD_SHIPPING
 namespace Zelda::Debug::State
 {
@@ -22,6 +21,11 @@ namespace Zelda::Debug::State
 	static FAutoConsoleVariableRef CVar_DebugShow(Zelda::Debug::State::show, bDrawDebugShow, TEXT("State 디버깅 상태 표시 On/Off"), ECVF_Default);
 }
 #endif
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCStateComponent)
+
+const FCharacterElementState FCharacterElementState::Empty = FCharacterElementState(FGameplayTag::EmptyTag, -1.0f, -1);
+
 
 UZCStateComponent::UZCStateComponent()
 {
@@ -62,13 +66,17 @@ void UZCStateComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 	// CC기 적용시 틱 적용
 	if (!Stagger.CCStagger.IsEmpty())
 	{
-		if (Stagger.CCStagger.Duration > 0.0f)
-		{
-			Stagger.CCStagger.Duration = FMath::Max(0.0f, Stagger.CCStagger.Duration - DeltaTime);
+		FCharacterElementState &CurrentCCStagger = Stagger.CCStagger;
 
-			if (Stagger.CCStagger.Duration == 0.0f)
+		if (CurrentCCStagger.Duration > 0.0f)
+		{
+			CurrentCCStagger.Duration = FMath::Max(0.0f, CurrentCCStagger.Duration - DeltaTime);
+
+			CurrentCCStagger.TimeRemaining += DeltaTime;
+
+			if (CurrentCCStagger.Duration == 0.0f)
 			{
-				Stagger.CCStagger.Reset();
+				CurrentCCStagger.Reset();
 				CurrentThreshold.Reset();
 				ElementData = nullptr;
 
@@ -79,10 +87,19 @@ void UZCStateComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 		}
 		// CurrentEelementStat의 duration이 -1인 경우 무한이 지속
 
-		// TODO : 액터 본인에게 데미지 주입 로직 작성(bIsDamageOnce가 false인 경우)
+		if (!CurrentCCStagger.bIsDamageOnce)
+		{
+			Health.Sub(CurrentCCStagger.ElementTickDamage);
+			OnHealthChanged.Broadcast(Health);
+			if (Health.IsZero()) { OnHealthZero.Broadcast(); }
+		}
 
 		// 주변에 전파
 		ProcessElementSpreading();
+	}
+	else
+	{
+		SetComponentTickEnabled(false);
 	}
 
 #if !UE_BUILD_SHIPPING
@@ -94,6 +111,11 @@ void UZCStateComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 			nullptr, FColor::Green, 0.0f, true);
 	}
 #endif // !UE_BUILD_SHIPPING
+}
+
+void UZCStateComponent::NotifyHit(FVector& Location, FVector& Direction)
+{
+	SufaceHitArray.Add({ Location, Direction });
 }
 
 float UZCStateComponent::ApplyDamage(float DamageAmount, const FElementInfo& NewElementInfo, bool IsCritical)
@@ -108,7 +130,6 @@ float UZCStateComponent::ApplyDamage(float DamageAmount, const FElementInfo& New
 
 	Health.Sub(AmountDamage);
 	OnHealthChanged.Broadcast(Health);
-
 	if (Health.IsZero()) { OnHealthZero.Broadcast(); }
 
 	//UZCLogger::Warning(TEXT("AmountDamage : {0}, StaggerAmount : {1}"), DamageAmount, StaggerAmount);
@@ -125,15 +146,12 @@ void UZCStateComponent::ApplyStagger(float AddStagger, const FElementInfo& NewEl
 
 	if (NewElementInfo.SpreadCount < 0) return;
 
-	UZCLogger::Warning(TEXT("1"));
-
 	FCharacterReactionOut Out;
 	FCharacterElementState &CurrentCCStagger = Stagger.CCStagger;
 
 	// 이미 원소가 적용되어 있는 경우
 	if (!Stagger.CCStagger.IsEmpty())
 	{
-		UZCLogger::Warning(TEXT("2 - 1"));
 		// 이미 적용된 원소와 새로운 원소가 동일한 원소이고
 		// 현재 적용된 원소값이 먼저(먼저 전파된 경우)
 		// 역전파를 막음
@@ -205,10 +223,13 @@ void UZCStateComponent::ApplyCCElement(const FCharacterReactionOut& ReactionResu
 
 	Stagger.CCStagger.InitFromOut(ReactionResult, SpreadingCount);
 
-	if (Stagger.CCStagger.bIsDamageOnce)
+	if (ReactionResult.FirstDamage != 0.0f)
 	{
-		// TODO: 초기 데미지가 있는 경우 Owner 액터에 데미지 주입
-		ReactionResult.bIsDamageOnce;
+		Health.Sub(ReactionResult.FirstDamage);
+		OnHealthChanged.Broadcast(Health);
+		if (Health.IsZero()) { OnHealthZero.Broadcast(); }
+
+		Stagger.CCStagger.TimeRemaining = 0.0f;
 	}
 
 	// 기존 FX 비활성화
@@ -225,17 +246,43 @@ void UZCStateComponent::ProcessElementSpreading()
 	if (!WorldSubsystem || Stagger.CCStagger.IsEmpty()) return;
 	if (!ElementData) return;
 
-	AActor* Owner = GetOwner();
-
-	if (!Owner) return;
+	if (!OwnerCharacter) return;
 
 	// 범위 내 액터들 엘리먼트 임계치 증가 시킴, 데미지가 0.0f이어도 확산이 일어나야 함.
 	FCharacterElementState& CurrentCCStagger = Stagger.CCStagger;
 
 	FElementInfo NewInfo(CurrentCCStagger.ElementTag, CurrentCCStagger.Duration, CurrentCCStagger.SpreadingCount);
-	float ApplyDamage = CurrentCCStagger.ElementTickDamage;
-	UZCGameplayFunctionLibrary::ApplyRadialDamage(NewInfo, this, ApplyDamage, Owner->GetActorLocation(), ElementData->SpreadingRange, UZCDamageType::StaticClass(), { Owner }, Owner, Owner->GetInstigatorController(), false, Zelda::Channel::Damage);
 
+	if (EnumHasAllFlags(static_cast<ESpreadShapeType>(ElementData->SpreadType), ESpreadShapeType::Element))
+	{
+		UZCGameplayFunctionLibrary::ApplyShapeDamage(
+			NewInfo, this, 0.0f, 
+			OwnerCharacter->GetMesh()->GetComponentTransform(), 
+			ElementData->SpreadShape, UZCDamageType::StaticClass(), 
+			{ OwnerCharacter }, OwnerCharacter, OwnerCharacter->GetInstigatorController(), Zelda::Channel::Damage);
+	}
+
+	if (EnumHasAllFlags(static_cast<ESpreadShapeType>(ElementData->SpreadType), ESpreadShapeType::Object))
+	{
+		if (SufaceHitArray.Num() == 0) return;
+
+		const FTransform& ComTransform = OwnerCharacter->GetMesh()->GetComponentTransform();
+
+		for (int i = SufaceHitArray.Num() - 1; i >= 0; --i)
+		{
+			FZCSurfaceInfo& Info = SufaceHitArray[i];
+
+			FVector Dir = ComTransform.TransformVectorNoScale(Info.LocalDirection).GetSafeNormal();
+			FVector Start = ComTransform.TransformPosition(Info.LocalLocation);
+
+			const bool bHit = UZCGameplayFunctionLibrary::ApplyTouchDamage(NewInfo, this, 0.0f, Start, Dir, UZCDamageType::StaticClass(), { OwnerCharacter }, OwnerCharacter, OwnerCharacter->GetInstigatorController(), Zelda::Channel::Damage);
+
+			if (!bHit)
+			{
+				SufaceHitArray.RemoveAt(i, EAllowShrinking::Yes);
+			}
+		}
+	}
 }
 
 void UZCStateComponent::CCElementFX(bool bEnabled)

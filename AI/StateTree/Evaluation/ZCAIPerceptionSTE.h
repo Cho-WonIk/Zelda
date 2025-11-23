@@ -8,7 +8,7 @@
 
 #include "AI/ZCAIControllerBase.h"
 #include "Character/Monster/ZCMonsterCharacter.h"
-#include "Struct/Struct/ZCPerceptionConfig.h"
+#include "GameData/Struct/ZCPerceptionConfig.h"
 #include "ZCAIPerceptionSTE.generated.h"
 
 class UZCAIPerceptionComponent;

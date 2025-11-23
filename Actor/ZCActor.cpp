@@ -2,6 +2,9 @@
 
 
 #include "Actor/ZCActor.h"
+#include "Components/ShapeComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Kismet/KismetMaterialLibrary.h"
 
 #include "Development/ZCLogger.h"
 #include "Gameplay/Damage/ZCDamage.h"
@@ -9,20 +12,49 @@
 #include "Gameplay/ZCGameplayFunctionLibrary.h"
 #include "Component/VFX/ZCNiagaraComponent.h"
 #include "Component/Chemistry/ZCMaterialStateComponent.h"
+#include "Component/Physics/ZCPhysActorComponent.h"
 #include "World/Subsystem/ZCWorldSubsystem.h"
 
+#include "Settings/WorldInteraction/ZCInteractionWorldSettings.h"
+
+#include "Interface/ZCDeviceInterface.h"
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCActor)
+
+
+FName AZCActor::MeshComponentName(TEXT("Mesh"));
+FName AZCActor::InteractionAreaName(TEXT("InteractionArea"));
 
 // Sets default values
-AZCActor::AZCActor()
+AZCActor::AZCActor(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	
+	Mesh = CreateDefaultSubobject<UMeshComponent>(AZCActor::MeshComponentName);
+	RootComponent = Mesh;
+	if (Mesh)
+	{
+		Mesh->SetNotifyRigidBodyCollision(true);
+		Mesh->OnComponentHit.AddDynamic(this, &AZCActor::OnHit);
+	}
+
+	InteractionArea = CreateDefaultSubobject<UShapeComponent>(AZCActor::InteractionAreaName);
+	if (InteractionArea)
+	{
+		InteractionArea->SetupAttachment(RootComponent);
+		InteractionArea->SetGenerateOverlapEvents(true);
+		InteractionArea->SetCollisionProfileName(Zelda::Profile::InteractionTrigger);
+		InteractionArea->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		InteractionArea->OnComponentBeginOverlap.AddDynamic(this, &AZCActor::OnEnterRange);
+		InteractionArea->OnComponentEndOverlap.AddDynamic(this, &AZCActor::OnExitRange);
+	}
 
 	NiagaraComponent = CreateDefaultSubobject<UZCNiagaraComponent>(TEXT("NiagaraComponent"));
 	NiagaraComponent->SetupAttachment(RootComponent);
 
 	MaterialStateComponent = CreateDefaultSubobject<UZCMaterialStateComponent>(TEXT("MaterialStateComponent"));
+
 }
 
 void AZCActor::PostInitializeComponents()
@@ -108,5 +140,141 @@ float AZCActor::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, 
 	}
 
 	return ActualDamage;
+}
+
+void AZCActor::Initialize(FZCActorTable* NewInfo)
+{
+	Info = NewInfo;
+	MaterialStateComponent->SetMaterial(Info->MaterialTag);
+
+	UZCActorPrimaryDataAsset* RawAsset = NewInfo->Asset.LoadSynchronous();
+	if (!RawAsset) return;
+
+	Shape = RawAsset->Shape;
+}
+
+void AZCActor::RequestOverlayState(EOverlayState StateToRequest)
+{
+	const EOverlayState OldState = CurrentOverlayState;
+	CurrentOverlayState |= StateToRequest;
+
+	// 상태가 실제로 변경된 경우에만 머티리얼 업데이트
+	if (OldState != CurrentOverlayState)
+	{
+		UpdateOverlayMaterial();
+	}
+}
+
+void AZCActor::ReleaseOverlayState(EOverlayState StateToRelease)
+{
+	const EOverlayState OldState = CurrentOverlayState;
+	CurrentOverlayState &= ~StateToRelease; // 비트 제거
+
+	// 만약 UltraHand 가 해제되었다면, 선택 상태도 함께 해제
+	if (EnumHasAllFlags(StateToRelease, EOverlayState::UltraHand))
+	{
+		CurrentOverlayState &= ~EOverlayState::SelectUltraHand;
+	}
+
+	if (OldState != CurrentOverlayState)
+	{
+		UpdateOverlayMaterial();
+	}
+}
+
+void AZCActor::SetGrabState(bool bGrab, IZCUltrahandDeviceInterface* NewOwner)
+{
+	if (bGrab)
+	{
+		EnumAddFlags(ZCActorState, EZCActorState::Grab);
+	}
+	else
+	{
+		EnumRemoveFlags(ZCActorState, EZCActorState::Grab);
+	}
+
+	UltraHandInterface = NewOwner;
+}
+
+void AZCActor::OnEnterRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (UltraHandInterface && EnumHasAllFlags(ZCActorState, EZCActorState::Grab))
+	{
+		if (AZCActor* ZCOtherActor = Cast<AZCActor>(OtherActor))
+		{
+			UltraHandInterface->AddAssembleCandidate(ZCOtherActor);
+		}
+	}
+}
+
+void AZCActor::OnExitRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (UltraHandInterface && EnumHasAllFlags(ZCActorState, EZCActorState::Grab))
+	{
+		if (AZCActor* ZCOtherActor = Cast<AZCActor>(OtherActor))
+		{
+			UltraHandInterface->RemoveAssembleCandidate(ZCOtherActor);
+		}
+	}
+}
+
+void AZCActor::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (MaterialStateComponent->HasActiveElement())
+	{
+		MaterialStateComponent->NotifyHit(Hit.ImpactPoint, -Hit.ImpactNormal);
+	}
+}
+
+void AZCActor::UpdateOverlayMaterial()
+{
+	const UZCInteractionWorldSettings* Settings = GetDefault<UZCInteractionWorldSettings>();
+
+	// 1) UltraHand 상태
+	if (EnumHasAllFlags(CurrentOverlayState, EOverlayState::UltraHand))
+	{
+		if (!IsValid(UltraHandMID))
+		{
+			UltraHandMID = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Settings->UltraHandSelectable.LoadSynchronous());
+		}
+
+		// SelectUltraHand 상태에 따라 색상 결정
+		const bool bIsSelected = EnumHasAllFlags(CurrentOverlayState, EOverlayState::SelectUltraHand);
+
+		const FLinearColor ColorToApply = bIsSelected ? Settings->UltraHandSelectedColor : Settings->UltraHandDefaultColor;
+
+		UltraHandMID->SetVectorParameterValue(Settings->UltraHandColorParameterName, ColorToApply);
+
+		SetOutlineMaterial(UltraHandMID);
+	}
+	// 2) ItemHighlight 상태
+	else if (EnumHasAllFlags(CurrentOverlayState, EOverlayState::ItemHighlight))
+	{
+		if (!IsValid(ItemOverlayMID))
+		{
+			ItemOverlayMID = UKismetMaterialLibrary::CreateDynamicMaterialInstance(this, Settings->UnacquiredItemOverlay.LoadSynchronous());
+		}
+		SetOutlineMaterial(ItemOverlayMID);
+	}
+	else
+	{
+		SetOutlineMaterial(nullptr);
+	}
+}
+
+void AZCActor::SetOutlineMaterial(UMaterialInterface* NewMaterial)
+{
+	CurrentOverlayMaterial = NewMaterial;
+
+	TInlineComponentArray<UMeshComponent*> MeshComponents(this);
+
+	for (UMeshComponent* MaterialMesh : MeshComponents)
+	{
+		if (MaterialMesh->IsA<UStaticMeshComponent>() || MaterialMesh->IsA<USkeletalMeshComponent>())
+		{
+			MaterialMesh->SetOverlayMaterial(NewMaterial);
+			MaterialMesh->SetRenderCustomDepth(NewMaterial ? true : false);
+		}
+	}
 }
 

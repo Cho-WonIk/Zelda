@@ -5,6 +5,8 @@
 #include "Gameplay/ZCGameplayFunctionLibrary.h"
 #include "World/Subsystem/ZCWorldSubsystem.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCMonsterStateComponent)
+
 UZCMonsterStateComponent::UZCMonsterStateComponent()
 {
 

@@ -14,4 +14,6 @@ class ZELDA_API UZCWeaponPrimaryData : public UZCItemPrimaryData
 {
 	GENERATED_BODY()
 	
+public:
+	virtual EZCPrimaryAssetType GetZCPrimaryAssetType() const { return EZCPrimaryAssetType::Weapon; }
 };

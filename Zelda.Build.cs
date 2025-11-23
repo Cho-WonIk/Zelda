@@ -15,6 +15,6 @@ public class Zelda : ModuleRules
 			"HairStrandsCore", "AnimGraphRuntime", "MotionWarping", "UMG", "Slate", "SlateCore", 
 			"GameplayTags", "GameplayStateTreeModule", "PropertyBindingUtils", "CommonInput", 
 			"CommonUI", "AIModule", "NavigationSystem", "DeveloperSettings", "PhysicsControl",
-			"GameplayTasks", "Chooser" });
+			"GameplayTasks", "Chooser", "PhysicsCore", "RenderCore", "RHI" });
 	}
 }

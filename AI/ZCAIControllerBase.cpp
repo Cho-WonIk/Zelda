@@ -13,6 +13,8 @@
 #include "Interface/ZCAIInterface.h"
 #include "Utils/Team/ZCTeam.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCAIControllerBase)
+
 AZCAIControllerBase::AZCAIControllerBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer.SetDefaultSubobjectClass<UZCPathFollowingComponent>(TEXT("PathFollowingComponent")))
 {
 	StateTreeAIComponent = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("State Tree AI Component"));

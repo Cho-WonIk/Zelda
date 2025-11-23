@@ -5,6 +5,8 @@
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "NiagaraSystem.h"
+#include "Physics/ZCShape.h"
+#include "GameData/Enum/ZCChemistry.h"
 #include "ChemistrySystemTable.generated.h"
 
 /*================= 원소와 물체간의 상호작용 =================*/
@@ -44,13 +46,13 @@ struct FElementCDO : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산될 수 있는 최대값"))
 	int32 MaxSpreadingCount = 0;
 
-	// 확산 범위
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 범위"))
-	float SpreadingRange = 0.0f;
+	// 확산 방법
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 방법", Bitmask, BitmaskEnum = ESpreadShapeType))
+	uint8 SpreadType;
 
-	// 원소가 주변에 확산될 때 주는 데미지, 0.0일 경우 데미지 전달은 없고 확산만 일어남
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 데미지"))
-	float Damage = 0.0f;
+	// 확산 Shape, SpreadShape이 Element인 경우 사용
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 모양"))
+	FZCShape SpreadShape;
 
 	/*==== FX ====*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX", meta = (DisplayName = "지속되는 VFX"))
@@ -149,11 +151,11 @@ struct FElementInstanceData
 	// 확산 카운트
 	int32 MaxSpreadingCount = 0;
 
-	// 확산 범위
-	float SpreadingRange = 0;
+	// 확산 방법
+	UPROPERTY(Transient) uint8 SpreadType;
 
-	// 주변에 주는 데미지
-	float Damage = 0.0f;
+	// 확산 Shape, SpreadShape이 Element인 경우 사용
+	UPROPERTY(Transient) FZCShape SpreadShape;
 
 	void InitFromCDO(const FElementCDO* InCDO)
 	{
@@ -166,9 +168,8 @@ struct FElementInstanceData
 		EndSFX = InCDO->EndSFX.Get();
 
 		MaxSpreadingCount = InCDO->MaxSpreadingCount;
-		SpreadingRange = InCDO->SpreadingRange;
-
-		Damage = InCDO->Damage;
+		SpreadType = InCDO->SpreadType;
+		SpreadShape = InCDO->SpreadShape;
 	}
 };
 

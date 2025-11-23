@@ -6,10 +6,11 @@
 #include "GameFramework/Character.h"
 #include "GenericTeamAgentInterface.h"
 #include "Physics/ZCCollision.h"
-#include "Struct/Enum/ZCDirection.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCDirection.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "Interface/ZCMontageInterface.h"
 #include "Interface/ZCCombatInterface.h"
+#include "Physics/ZCShape.h"
 #include "ZCCharacter.generated.h"
 
 namespace BoneSocket
@@ -114,6 +115,11 @@ protected:
 	virtual float InternalTakeRadialDamage(float Damage, struct FRadialDamageEvent const& RadialDamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	virtual float InternalTakePointDamage(float Damage, struct FPointDamageEvent const& PointDamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+	/*======== 콜리전 관련 함수들 =============*/
+protected:
+	UFUNCTION()
+	virtual void OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
 	/*=================캐릭터 공통 동작===============*/
 public:
 	bool IsCritialBone(const FName& BoneName) const { return CriticalBones.Contains(BoneName); }
@@ -161,9 +167,9 @@ protected:
 	bool bIsEquipShield = false; // 방패 손에 장착 여부
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
-	class AZCWeaponActor* CurrentWeapon = nullptr;
+	TObjectPtr<class AZCWeaponActor> CurrentWeapon = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shield")
-	class AZCShieldActor* CurrentShield = nullptr;
+	TObjectPtr<class AZCShieldActor> CurrentShield = nullptr;
 
 protected:
 	// 팀 ID 설정
@@ -190,5 +196,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "VFX")
 	TObjectPtr<class UZCNiagaraComponent> NiagaraComponent;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh", meta = (DisplayName = "상호작용 히트박스"))
+	struct FZCShape CharacterShape;
 
 };

@@ -8,10 +8,12 @@
 #include "Player/ZCPlayerController.h"
 #include "Player/ZCPlayerState.h"
 
-#include "GameData/ZCItemTable.h"
+#include "GameData/Table/ZCItemTable.h"
 
 #include "UI/Common/FaceButton/ZCFaceButtonWidget.h"
 #include "UI/HUD/SubWidget/ZCShortCutCommonWidget.h"
+
+#include "Development/ZCLogger.h"
 
 
 void UZCHUDCommonWidget::NativeConstruct()
@@ -21,7 +23,8 @@ void UZCHUDCommonWidget::NativeConstruct()
 	PlayerController = Cast<AZCPlayerController>(GetOwningPlayer());
 	check(PlayerController);
 
-	PlayerState = PlayerController->GetZCPlayerStateChecked<AZCPlayerState>();
+	PlayerState = PlayerController->GetZCPlayerState();
+	check(PlayerState);
 
 	HideActionIndicatorUI();
 	HideFaceButtonUI();
@@ -71,14 +74,13 @@ void UZCHUDCommonWidget::ShowShortCutUI(EItemType ItemType)
 	}
 
 	UWidget* ActiveWidget = ShortCutSwitcher->GetActiveWidget();
-
 	CurrentShortCutWidget = Cast<UZCShortCutCommonWidget>(ActiveWidget);
-
 	CurrentShortCutWidget->SetItemList(PlayerState->GetInventoryComponent()->ShowInventory(ItemType));
 }
 
 void UZCHUDCommonWidget::ScrollShortCutItemList(int32 Direction)
 {
+	//if (!CurrentShortCutWidget) return;
 	CurrentShortCutWidget->ScrollItemList(Direction);
 }
 

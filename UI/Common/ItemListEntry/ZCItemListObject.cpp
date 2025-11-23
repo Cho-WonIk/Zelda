@@ -24,7 +24,7 @@ void UZCItemListObject::InitializeFromData(const FZCInventoryUIEntry& ItemKey, c
 	InventoryIndex = ItemKey.InventoryIndex;
 
 	// 아이템 테이블에서 데이터를 가져옴
-	Type = ItemData.Type;
+	Type = ItemData.ItemType;
 	Rarity = ItemData.Rarity;
 	Name = ItemData.Name;
 	Description = ItemData.Description;

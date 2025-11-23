@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Perception/AIPerceptionComponent.h"
-#include "Struct/Struct/ZCPerceptionConfig.h"
+#include "GameData/Struct/ZCPerceptionConfig.h"
 #include "ZCAIPerceptionComponent.generated.h"
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAggroUpdateDelegate, float);

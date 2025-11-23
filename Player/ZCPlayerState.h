@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
-#include "GameData/ZCItemTable.h"
+#include "GameData/Table/ZCItemTable.h"
 #include "ZCPlayerState.generated.h"
 
  class UZCInventoryComponent;

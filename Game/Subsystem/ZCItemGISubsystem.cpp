@@ -2,6 +2,7 @@
 
 
 #include "Game/Subsystem/ZCItemGISubsystem.h"
+#include "Game/ZCGameInstance.h"
 
 UZCItemGISubsystem& UZCItemGISubsystem::Get(UObject* Context)
 {
@@ -13,7 +14,9 @@ void UZCItemGISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	UDataTable* NoramlItemTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("")));
+	UZCGameInstance* ZCGameInstance = Cast<UZCGameInstance>(GetGameInstance());
+
+	const UDataTable* const NoramlItemTable = ZCGameInstance->GetNoramlItemTable();
 	if (NoramlItemTable)
 	{
 		TArray<uint8*> RowData;
@@ -29,7 +32,7 @@ void UZCItemGISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		}
 	}
 
-	UDataTable* WeaponItemTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/GameData/ZCWeaponTable.ZCWeaponTable")));
+	const UDataTable* const WeaponItemTable = ZCGameInstance->GetWeaponItemTable();
 	if (WeaponItemTable)
 	{
 		TArray<uint8*> RowData;
@@ -43,7 +46,7 @@ void UZCItemGISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		}
 	}
 
-	UDataTable* ShieldItemTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, TEXT("/Game/ZeldaClone/GameData/ZCShieldTable.ZCShieldTable")));
+	const UDataTable* const ShieldItemTable = ZCGameInstance->GetShieldItemTable();
 	if (ShieldItemTable)
 	{
 		TArray<uint8*> RowData;

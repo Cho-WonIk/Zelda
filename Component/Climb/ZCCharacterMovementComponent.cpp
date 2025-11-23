@@ -22,6 +22,8 @@ namespace Zelda::Debug::Climb
 }
 #endif
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCCharacterMovementComponent)
+
 UZCCharacterMovementComponent::UZCCharacterMovementComponent(const FObjectInitializer& ObjectInitializer)
 {
 }

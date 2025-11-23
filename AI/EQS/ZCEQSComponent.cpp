@@ -6,6 +6,8 @@
 #include "EnvironmentQuery/EnvQueryManager.h"
 #include "EnvironmentQuery/EnvQueryInstanceBlueprintWrapper.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCEQSComponent)
+
 // Sets default values for this component's properties
 UZCEQSComponent::UZCEQSComponent()
 {

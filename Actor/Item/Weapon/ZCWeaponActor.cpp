@@ -12,7 +12,9 @@
 #include "GameFramework/DamageType.h"
 #include "Engine/DamageEvents.h"
 
-AZCWeaponActor::AZCWeaponActor()
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCWeaponActor)
+
+AZCWeaponActor::AZCWeaponActor(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	Mesh->SetCollisionProfileName(Zelda::Profile::Weapon);
 	HitTraceComponent = CreateDefaultSubobject<UZCHitTraceComponent>(TEXT("HitTraceComponent"));
@@ -25,19 +27,16 @@ void AZCWeaponActor::PostInitializeComponents()
 	HitTraceComponent->OnHitActor.BindUObject(this, &AZCWeaponActor::OnHitActor);
 }
 
-void AZCWeaponActor::Initialize(FZCItemTable* NewItem)
+void AZCWeaponActor::Initialize(FZCActorTable* NewItem)
 {
 	Super::Initialize(NewItem);
-	if (Info->Type == EItemType::Weapon)
+	if (ItemInfo->ItemType != EItemType::Weapon) return;
+
+	WeaponInfo = static_cast<FZCWeaponTable*>(Info);
+	if (const FElementInstanceData* const ElementInfo = GetWorld()->GetSubsystem<UZCWorldSubsystem>()->GetObjectElementInstanceData(WeaponInfo->ElementType))
 	{
-		WeaponInfo = static_cast<FZCWeaponTable*>(Info);
-
-		if (const FElementInstanceData * const ElementInfo = GetWorld()->GetSubsystem<UZCWorldSubsystem>()->GetObjectElementInstanceData(WeaponInfo->ElementType))
-		{
-			WeaponElementInfo.ElementTag = WeaponInfo->ElementType;
-			WeaponElementInfo.SpreadCount = ElementInfo->MaxSpreadingCount;
-
-		}
+		WeaponElementInfo.ElementTag = WeaponInfo->ElementType;
+		WeaponElementInfo.SpreadCount = ElementInfo->MaxSpreadingCount;
 	}
 }
 

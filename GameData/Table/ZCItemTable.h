@@ -4,34 +4,31 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
-#include "GameplayTagContainer.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Table/ZCActorTable.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "Gameplay/Damage/ZCDamage.h"
-#include "GameData/PrimaryData/ZCPrimaryDataAsset.h"
 #include "ZCItemTable.generated.h"
 
 USTRUCT(BlueprintType)
-struct FZCItemTable : public FTableRowBase
+struct FZCItemTable : public FZCActorTable
 {
 	GENERATED_BODY()
 
 public:
 	FZCItemTable()
-		: ID(-1)
-		, Type(EItemType::None)
+		: ItemType(EItemType::None)
 		, Rarity(Rarity::Common)
 		, Name(TEXT(""))
 		, MaxCount(1)
 		, bIsDestroyable(false)
 		, Durability(-1)
 		, Description(TEXT(""))
-	{}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "아이템 ID", DisplayPriority = 0))
-	int32 ID;
+	{
+		Type = EZCActortype::Item;
+	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "아이템 분류", DisplayPriority = 1))
-	EItemType Type;
+	EItemType ItemType;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "희귀도", DisplayPriority = 2))
 	Rarity Rarity;
@@ -54,15 +51,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "아이템 아이콘", DisplayPriority = 8))
 	TSoftObjectPtr<UTexture2D> Icon;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "아이템 ", DisplayPriority = 9))
-	TSoftObjectPtr<UZCPrimaryDataAsset> Asset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "아이템", meta = (DisplayName = "아이템 재질", DisplayPriority = 10, GameplayTagFilter = "Material"))
-	FGameplayTag MaterialTag;
-
 	bool operator==(const FZCItemTable& Other) const
 	{
-		return ID == Other.ID && Type == Other.Type && Rarity == Other.Rarity && Durability == Other.Durability && MaterialTag == Other.MaterialTag;
+		return FZCActorTable::operator==(Other) && ItemType == Other.ItemType && Rarity == Other.Rarity && Durability == Other.Durability;
 	}
 };
 
@@ -77,7 +68,7 @@ public:
 		: WeaponType(EWeaponType::None)
 		, AttackPower(1)
 		, AttackSpeed(1.0f)
-	{ Type = EItemType::Weapon; }
+	{ ItemType = EItemType::Weapon; }
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "무기", meta = (DisplayName = "무기 타입", DisplayPriority = 100))
 	EWeaponType WeaponType;
@@ -108,7 +99,7 @@ struct FZCShieldTable : public FZCItemTable
 
 public:
 	FZCShieldTable()
-	{ Type = EItemType::Shield; }
+	{ ItemType = EItemType::Shield; }
 
 	bool operator==(const FZCShieldTable& Other) const
 	{

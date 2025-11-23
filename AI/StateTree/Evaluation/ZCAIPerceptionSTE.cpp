@@ -6,6 +6,8 @@
 #include "Actor/Item/Weapon/ZCWeaponActor.h"
 #include "Actor/Item/Shield/ZCShieldActor.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCAIPerceptionSTE)
+
 void FZCAIPerceptionSTE::TreeStart(FStateTreeExecutionContext& Context) const
 {
 	Super::TreeStart(Context);

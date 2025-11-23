@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemTable.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemCharacterTable.h"
+#include "GameData/Table/ChemistrySystemTable.h"
+#include "GameData/Table/ChemistrySystemCharacterTable.h"
 #include "ZCChemistryGISubsystem.generated.h"
 
 UCLASS() 
@@ -50,27 +50,11 @@ public:
 
 
 protected:
-	UPROPERTY()
-	UDataTable* ObjectReactionTable = nullptr;
-	UPROPERTY()
-	UDataTable* ObjectMaterialTable = nullptr;
-	UPROPERTY()
-	UDataTable* ObjectElementTable = nullptr;
-
 	TMap<FReactionKey, const FReactionOut*> ObjectRule;
 	TMap<FGameplayTag, const FMaterialCDO*> ObjectMaterial;
 	TMap<FGameplayTag, const FElementCDO*> ObjectElement;
 
 protected:
-	UPROPERTY()
-	UDataTable* CharacterReactionTable = nullptr;
-
-	UPROPERTY()
-	UDataTable* CharacterElementTable = nullptr;
-
-	UPROPERTY()
-	UDataTable* CharacterTypeTable = nullptr;
-
 	TMap< FCharacterReactionKey, const FCharacterReactionOut*> CharacterRule;
 	TMap<FGameplayTag, const FCharacterElementCDO*> CharacterElement;
 	TMap<FGameplayTag, const FCharacterMonsterTypeCDO*> CharacterType;

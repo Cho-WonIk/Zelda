@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Kismet/GameplayStatics.h"
-#include "GameData/ZCItemTable.h"
+#include "GameData/Table/ZCItemTable.h"
 #include "Actor/Item/ZCItemActor.h"
 #include "ZCItemGISubsystem.generated.h"
 

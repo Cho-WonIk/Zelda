@@ -7,10 +7,13 @@ namespace Zelda
 {
 	namespace Channel
 	{
+
 		static constexpr ECollisionChannel Damage				= ECC_GameTraceChannel1;
 		static constexpr ECollisionChannel CameraToTarget		= ECC_GameTraceChannel2;
 		static constexpr ECollisionChannel CameraAdjust			= ECC_GameTraceChannel3;
 		static constexpr ECollisionChannel Climbable			= ECC_GameTraceChannel4;
+		static constexpr ECollisionChannel Ultrahand			= ECC_GameTraceChannel5;
+
 	}
 
 	namespace Object

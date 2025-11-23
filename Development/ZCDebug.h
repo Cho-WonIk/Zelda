@@ -47,6 +47,30 @@ namespace Zelda
 			inline constexpr const TCHAR* all			= TEXT("zelda.debug.state.all");
 			inline constexpr const TCHAR* show			= TEXT("zelda.debug.state.show");
 		}
+
+		namespace Gameplay
+		{
+			inline constexpr const TCHAR* all			= TEXT("zelda.debug.gameplay.all");
+			inline constexpr const TCHAR* shape			= TEXT("zelda.debug.gameplay.shape");
+		}
+
+		namespace Ultrahand
+		{
+			inline constexpr const TCHAR* all			= TEXT("zelda.debug.ultrahand.all");
+			inline constexpr const TCHAR* Device		= TEXT("zelda.debug.ultrahand.device");
+			inline constexpr const TCHAR* Gear			= TEXT("zelda.debug.ultrahand.gear");
+			inline constexpr const TCHAR* Assemble		= TEXT("zelda.debug.ultrahand.assemble");
+		}
 	}
+}
+#endif
+
+#if !UE_BUILD_SHIPPING
+namespace Zelda::Debug::Ultrahand
+{
+	extern bool bDrawDebugAll;
+	extern bool bDrawDevice;
+	extern bool bDrawGear;
+	extern bool bDrawAssemble;
 }
 #endif

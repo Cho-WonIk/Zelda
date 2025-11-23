@@ -232,6 +232,12 @@ public:
 		else
 		{
 			idx = NextOverwrite;
+
+			if (Pool[idx].OverwriteCallback)
+			{
+				Pool[idx].OverwriteCallback(idx);
+			}
+
 			Pool[idx].Reset();
 			NextOverwrite = (NextOverwrite + 1) % PoolSize;
 		}

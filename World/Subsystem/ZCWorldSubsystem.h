@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "GameData/ZCItemTable.h"
+#include "GameData/Table/ZCItemTable.h"
 #include "Actor/Item/Weapon/ZCWeaponActor.h"
 #include "Utils/Pool/ZCPoolingClass.h"
 #include "Engine/StreamableManager.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemTable.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemCharacterTable.h"
+#include "GameData/Table/ChemistrySystemTable.h"
+#include "GameData/Table/ChemistrySystemCharacterTable.h"
 #include "ZCWorldSubsystem.generated.h"
 
 class UNiagaraSystem;
@@ -18,16 +18,26 @@ struct FElementCDO;
 class UZCChemistryGISubsystem;
 class UZCMaterialStateComponent;
 
+DECLARE_STATS_GROUP(TEXT("Zelda"), STATGROUP_Zelda, STATCAT_Advanced);
+DECLARE_CYCLE_STAT(TEXT("WorldSubsystem Tick"), STAT_WorldSubsystem_Tick, STATGROUP_Zelda);
+DECLARE_CYCLE_STAT(TEXT("WorldSubsystem Tick/ProcessSpreading"), STAT_WorldSubsystem_ProcessSpreading, STATGROUP_Zelda);
+
 DECLARE_MULTICAST_DELEGATE(FOnAssetLoad);
 
 UCLASS()
-class ZELDA_API UZCWorldSubsystem : public UWorldSubsystem
+class ZELDA_API UZCWorldSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void PostInitialize() override;
 	virtual void Deinitialize() override;
+
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override {
+		RETURN_QUICK_DECLARE_CYCLE_STAT(UZCWorldSubsystem, STATGROUP_Tickables);
+	}
 
 public:
 	FOnAssetLoad OnAssetLoadFinished;
@@ -93,29 +103,57 @@ private:
 
 
 	/*===================================================== 화학 반응 ==========================================================*/
+
+public:
+	// MaterialStateComponent 관리
+	FMaterialHandle RegisterMaterial(AZCActor* Owner, UZCNiagaraComponent* VFXComp, FGameplayTag MaterialTag);
+	void UnregisterMaterial(FMaterialHandle Handle);
+
+	// MaterialStateComponent가 호출
+	void ApplyElementExposure(FMaterialHandle Handle, const FElementInfo& NewElementInfo);
+	void NotifyHit(FMaterialHandle Handle, const FVector& Location, const FVector& Direction);
+
+	// Getter
+	const FMaterialRuntimeData* GetData(FMaterialHandle Handle) const;
+	FGameplayTag GetMaterialTag(FMaterialHandle Handle) const;
+
+#if WITH_EDITOR
+	// 디버그용: 반응식과 임계치를 무시하고 강제로 상태를 적용
+	void DebugForceSetElement(FMaterialHandle Handle, const FReactionOut& ForcedReaction);
+#endif // WITH_EDITOR
+
+protected:
+	// 실제 로직 구현부
+	void ProcessReaction(FMaterialRuntimeData& Data, const FElementInfo& NewInfo);
+	void ApplyElement(FMaterialRuntimeData& Data, const FReactionOut& ReactionResult, int32 NewSpreadCount);
+	void ProcessSpreading(FMaterialRuntimeData& Data);
+	void UpdateFX(FMaterialRuntimeData& Data, bool bStart, bool bLoop, bool bEnd);
+
+private:
+	// --- Data Oriented Storage ---
+	UPROPERTY()
+	TArray<FMaterialRuntimeData> MaterialDataArray;
+
+	// Handle ID -> Array Index 매핑
+	TMap<int32, int32> HandleToIndexMap;
+
+	// Array Index -> Handle ID 매핑 (Swap시 역참조용)
+	TArray<int32> IndexToHandleMap;
+
+	// 다음 발급할 핸들 ID
+	int32 NextHandleID = 0;
+
 public:
 	bool TryGetObjectOutCome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FReactionOut& Out) const;
 	bool TryGetCharacterOutcome(const FGameplayTag& SourceTag, const FGameplayTag& TargetTag, FCharacterReactionOut& Out) const;
 
-	FORCEINLINE const FElementInstanceData* GetObjectElementInstanceData(const FGameplayTag& Element) const
-	{
-		return ObjectElementMap.Find(Element);
-	}
+	FORCEINLINE const FElementInstanceData* GetObjectElementInstanceData(const FGameplayTag& Element) const { return ObjectElementMap.Find(Element); }
 
-	FORCEINLINE const FMaterialInstanceData* GetObjectMaterialInstanceData(const FGameplayTag& Material) const
-	{
-		return ObjectMaterialMap.Find(Material);
-	}
+	FORCEINLINE const FMaterialInstanceData* GetObjectMaterialInstanceData(const FGameplayTag& Material) const { return ObjectMaterialMap.Find(Material); }
 
-	FORCEINLINE const FCharacterElementInstanceData* GetCharacterElementInstanceData(const FGameplayTag& CElement) const
-	{
-		return CharacterElementMap.Find(CElement);
-	}
+	FORCEINLINE const FCharacterElementInstanceData* GetCharacterElementInstanceData(const FGameplayTag& CElement) const { return CharacterElementMap.Find(CElement); }
 
-	FORCEINLINE const FCharacterArmorTypeInstanceData* GetCharacterMonsterTypeInstanceData(const FGameplayTag& CMonster) const
-	{
-		return CharacterMonsterTypeMap.Find(CMonster);
-	}
+	FORCEINLINE const FCharacterArmorTypeInstanceData* GetCharacterMonsterTypeInstanceData(const FGameplayTag& CMonster) const { return CharacterMonsterTypeMap.Find(CMonster); }
 
 protected:
 	// 로드할 애셋들 

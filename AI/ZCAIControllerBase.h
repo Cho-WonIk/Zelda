@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
-#include "Struct/Enum/ZCMonster.h"
-#include "Struct/Struct/ZCPerceptionConfig.h"
+#include "GameData/Enum/ZCMonster.h"
+#include "GameData/Struct/ZCPerceptionConfig.h"
 #include "ZCAIControllerBase.generated.h"
 
 struct FAIStimulus;

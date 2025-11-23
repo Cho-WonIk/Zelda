@@ -3,6 +3,8 @@
 
 #include "Actor/Spawner/ZCSpawnerActor.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCSpawnerActor)
+
 // Sets default values
 AZCSpawnerActor::AZCSpawnerActor()
 {

@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "Struct/Enum/ZCMonster.h"
+#include "GameData/Enum/ZCMonster.h"
 
 class AZCWeaponActor;
 class AZCShieldActor;

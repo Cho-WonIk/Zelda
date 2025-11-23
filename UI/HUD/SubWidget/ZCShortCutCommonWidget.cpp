@@ -4,7 +4,7 @@
 #include "UI/HUD/SubWidget/ZCShortCutCommonWidget.h"
 #include "CommonListView.h"
 #include "Components/TextBlock.h"
-#include "GameData/ZCItemTable.h"
+#include "GameData/Table/ZCItemTable.h"
 #include "UI/Common/ItemListEntry/ZCItemListObject.h"
 
 

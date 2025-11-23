@@ -9,6 +9,7 @@
 #include "Actor/Item/Weapon/ZCWeaponActor.h"
 #include "Actor/Item/Shield/ZCShieldActor.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCInventoryComponent)
 
 // Sets default values for this component's properties
 UZCInventoryComponent::UZCInventoryComponent()
@@ -89,7 +90,7 @@ bool UZCInventoryComponent::AddItem(TUniquePtr<struct FZCItemTable> NewItem)
 {
 	if (!NewItem.IsValid()) return false;
 
-	switch (NewItem->Type)
+	switch (NewItem->ItemType)
 	{
 	case EItemType::Normal:
 		return AddNormalItem(MoveTemp(NewItem));

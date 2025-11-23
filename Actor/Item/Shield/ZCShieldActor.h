@@ -15,14 +15,14 @@ class ZELDA_API AZCShieldActor : public AZCItemActor
 	GENERATED_BODY()
 
 public:
-	AZCShieldActor();
+	AZCShieldActor(const FObjectInitializer& ObjectInitializer);
 
 	/*===========오버라이드 함수들===========*/
 protected:
 	virtual void PostInitializeComponents() override;
 
 public:
-	virtual void Initialize(FZCItemTable* NewItem) override;
+	virtual void Initialize(FZCActorTable* NewItem) override;
 
 	/*===========Getter===========*/
 public:

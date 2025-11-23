@@ -14,4 +14,6 @@ class ZELDA_API UZCShieldPrimaryData : public UZCItemPrimaryData
 {
 	GENERATED_BODY()
 	
+public:
+	virtual EZCPrimaryAssetType GetZCPrimaryAssetType() const { return EZCPrimaryAssetType::Shield; }
 };

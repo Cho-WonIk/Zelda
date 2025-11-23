@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Character/ZCCharacter.h"
 #include "Interface/ZCAIInterface.h"
-#include "Struct/Enum/ZCMonster.h"
+#include "GameData/Enum/ZCMonster.h"
 #include "ZCMonsterCharacter.generated.h"
 
 class UWidgetComponent;

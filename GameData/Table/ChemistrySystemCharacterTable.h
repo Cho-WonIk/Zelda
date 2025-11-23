@@ -5,6 +5,8 @@
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "NiagaraSystem.h"
+#include "Physics/ZCShape.h"
+#include "GameData/Enum/ZCChemistry.h"
 #include "ChemistrySystemCharacterTable.generated.h"
 
 // 데미지 적용 공식은 StateComponent에서 전담 여긴 단순히 BaseDamage만 설정
@@ -79,9 +81,13 @@ struct FCharacterElementCDO : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산될 수 있는 최대값"))
 	int32 MaxSpreadingCount = 0;
 
-	// 확산 범위
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 범위"))
-	float SpreadingRange = 0;
+	// 확산 방법
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 방법", Bitmask, BitmaskEnum = ESpreadShapeType))
+	uint8 SpreadType;
+
+	// 확산 Shape, SpreadShape이 Element인 경우 사용
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "확산 모양"))
+	FZCShape SpreadShape;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Effect", meta = (DisplayName = "머티리얼"))
 	TSoftObjectPtr<UMaterialInterface> ElementMaterial;
@@ -173,8 +179,11 @@ struct FCharacterElementInstanceData
 	// 확산 카운트
 	int32 MaxSpreadingCount = 0;
 
-	// 확산 범위
-	float SpreadingRange = 0;
+	// 확산 방법
+	UPROPERTY(Transient) uint8 SpreadType;
+
+	// 확산 Shape, SpreadShape이 Element인 경우 사용
+	UPROPERTY(Transient) FZCShape SpreadShape;
 
 	void InitFromCDO(const FCharacterElementCDO* InCDO)
 	{
@@ -183,7 +192,9 @@ struct FCharacterElementInstanceData
 		LoopMaterial = InCDO->ElementMaterial.Get();
 
 		MaxSpreadingCount = InCDO->MaxSpreadingCount;
-		SpreadingRange = InCDO->SpreadingRange;
+		
+		SpreadType = InCDO->SpreadType;
+		SpreadShape = InCDO->SpreadShape;
 	}
 };
 

@@ -21,6 +21,8 @@
 
 #include "Development/ZCLogger.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCCharacter)
+
 FName AZCCharacter::StateComponentName(TEXT("State"));
 
 // Sets default values
@@ -63,6 +65,14 @@ AZCCharacter::AZCCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -90.0f), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetCollisionProfileName(TEXT("PhysicsActor"));
+
+
+
+	GetMesh()->SetNotifyRigidBodyCollision(true);
+	GetMesh()->OnComponentHit.AddDynamic(this, &AZCCharacter::OnHit);
+
+	GetCapsuleComponent()->SetNotifyRigidBodyCollision(true);
+	GetCapsuleComponent()->OnComponentHit.AddDynamic(this, &AZCCharacter::OnHit);
 }
 
 void AZCCharacter::CanGotoNextSection(const FName MontageName, const FName NextSectionName)
@@ -142,6 +152,7 @@ void AZCCharacter::PostInitializeComponents()
 
 	StateComponent->SetVFXComponent(NiagaraComponent);
 	StateComponent->SetOwnerCharacter(this);
+	StateComponent->SetCharacterShape(&CharacterShape);
 }
 
 float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -238,6 +249,9 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 		}
 	}
 
+	// 0.0인경우 엘리먼트 만 전파됨, 엘리먼트에 의한 데미지는 StateComponent에서 처리
+	
+
 	// 스탯 컴포넌트에 데미지 전달
 	// 데미지, 원소 태그, 데미지 타입
 	ActualDamage = StateComponent->ApplyDamage(ActualDamage, ElementInfo, bIsCritial);
@@ -247,12 +261,18 @@ float AZCCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
 	// 헤비			: 크리티컬 공격
 	// 폭발			: 폭발 또는 그로기 수치 도달
 
-	EHitStrength HitStrength = EHitStrength::Light;
-	//if (StateComponent->ElementRelation(ElementTag) == -1) HitStrength = EHitStrength::Medium;
-	if (bIsCritial) HitStrength = EHitStrength::Heavy;
-	//if (DamageTypeTag == TAG_DamageType_Explosion || StateComponent->IsStaggerFull()) HitStrength = EHitStrength::Explosion;
+	if (HitResult != nullptr && StateComponent->IsCanPlayElementStaggerMontage() || ActualDamage != 0.0f)
+	{
+		EHitStrength HitStrength = EHitStrength::Light;
 
-	//HitReactionComponent->PerformHitReaction(DamageCauser, *HitResult, HitStrength, StateComponent->IsDead(), false);
+		if (StateComponent->IsWeakTag(ElementInfo.ElementTag)) HitStrength = EHitStrength::Medium;
+
+		if (bIsCritial) HitStrength = EHitStrength::Heavy;
+
+		if (DamageTypeTag == TAG_DamageType_Explosion || StateComponent->IsDamageStaggerFull()) HitStrength = EHitStrength::Explosion;
+
+		HitReactionComponent->PerformHitReaction(DamageCauser, *HitResult, HitStrength, StateComponent->IsDead(), false);
+	}
 
 	return ActualDamage;
 }
@@ -265,6 +285,19 @@ float AZCCharacter::InternalTakeRadialDamage(float Damage, FRadialDamageEvent co
 float AZCCharacter::InternalTakePointDamage(float Damage, FPointDamageEvent const& PointDamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	return Super::InternalTakePointDamage(Damage, PointDamageEvent, EventInstigator, DamageCauser);
+}
+
+void AZCCharacter::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (StateComponent->IsElementStaggerFull())
+	{
+		const FTransform& ComTransform = GetMesh()->GetComponentTransform();
+		
+		FVector LocalHitLocation = ComTransform.InverseTransformPosition(Hit.ImpactPoint);
+		FVector LocalArrowDir = ComTransform.InverseTransformVectorNoScale(-Hit.ImpactNormal);
+
+		StateComponent->NotifyHit(LocalHitLocation, LocalArrowDir);
+	}
 }
 
 void AZCCharacter::OnDeath()

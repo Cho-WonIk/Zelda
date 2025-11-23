@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCItemStruct.generated.h"
 
 USTRUCT(BlueprintType)

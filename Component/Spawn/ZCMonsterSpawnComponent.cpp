@@ -6,6 +6,8 @@
 #include "Components/ArrowComponent.h"
 #include "Kismet/GameplayStatics.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCMonsterSpawnComponent)
+
 // Sets default values for this component's properties
 UZCMonsterSpawnComponent::UZCMonsterSpawnComponent()
 {

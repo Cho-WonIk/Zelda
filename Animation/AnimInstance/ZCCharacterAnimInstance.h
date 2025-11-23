@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCCharacterAnimInstance.generated.h"
 
 class AZCCharacter;

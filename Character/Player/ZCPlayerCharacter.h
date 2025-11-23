@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Character/ZCCharacter.h"
-#include "Struct/Enum/ZCItemType.h"
+#include "GameData/Enum/ZCItemType.h"
 #include "ZCPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -14,6 +14,7 @@ struct FInputActionValue;
 class UZCCharacterMovementComponent;
 class UZCLockSpringArmComponent;
 class UZCPlayerStateComponent;
+class AZCPlayerController;
 
 enum ECustomMovementMode : uint8;
 
@@ -78,6 +79,15 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "IK|Glide")
 	FTransform GetGlideRightHandIK() const;
 
+/*==================콜리전 관련 함수들===============*/
+protected:
+	UFUNCTION()
+	void OnEnterHighlightRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnExitHighlightRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+
 /*==================캐릭터 컴포넌트===================*/
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -89,6 +99,9 @@ protected:
 	// 글라이더
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Glide, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class USkeletalMeshComponent> GlideMeshComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Interation, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class USphereComponent> HighlightArea;
 
 	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	class UZCCharacterMovementComponent* ZCCharacterMovementComponent;
@@ -134,62 +147,89 @@ protected:
 
 /*==================입력 액션, XBOX 컨트롤러 기준===================*/
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> MoveAction;			// R스틱
+	// 인게임에서 활성화
+	
+	// 이동
+	// 카메라
+
+	// 공격
+	// 웅크리기
+
+	// 점프
+	// 말 부르기
+
+	// 상호작용(아이템 픽업, 패링, 클라이밍 다운)
+	// 아이템 숏컷(무기, 방어구, 일반 아이템) -> 이후 스크롤 기능
+	// 오른손 호출 -> 플레이어 컨트롤러에서 구현
+	
+	/*
+	* 플레이어 컨트롤러에서 구현
+	LB버튼 조작(오른손기능 전환) 이후 맵핑 컨텍스트를 바꾸어 사용
+	이후 D패드의 조작이 바뀜
+
+	*/
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> LookAction;			// L스틱
+	TObjectPtr<UInputAction> MoveAction;			// 캐릭터 이동
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> JumpAction;			// Y버튼
+	TObjectPtr<UInputAction> LookAction;			// 카메라 무빙
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> AttackAction;			// X버튼
+	TObjectPtr<UInputAction> JumpAction;			// 점프 액션
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> InteraactionAction;	// B버튼
+	TObjectPtr<UInputAction> AttackAction;			// 공격 액션
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> RunAction;				// A버튼
+	TObjectPtr<UInputAction> ParryAction;			// 패리 액션
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> AttentionAction;		// LT버튼
+	TObjectPtr<UInputAction> CrouchAction;			// 웅크리기 액션
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UInputAction> CrouchAction;			// LS버튼
+	TObjectPtr<UInputAction> RunAction;				// 달리기 액션
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> AttentionAction;		// 주목 버튼
+
 
 /*==================입력 바인딩===================*/
 protected:
-	// L스틱 입력
+	// 이동 액션
 	void Move(const FInputActionValue& Value);
-	// R스틱 입력
+	// 카메라 액션
 	void Look(const FInputActionValue& Value);
 
-	// Y버튼 입력
+	// 점프 액션
 	virtual void Jump() override;
 	virtual void StopJumping() override;
 
-	// X버튼 입력
+	// 공격 액션
 	void StartAttack();
 	void NormalAttack();
 	void AttackCharging();
 	void HoldAttack();
 	void FinishAttack();	// 입력바인딩은 안되었지만 공격 종료 시 호출되는 함수
 
-	// B버튼 입력
-	void Interaction();
+	// 패리 액션
+	void StartParry();
 
-	// A버튼 입력
+	// 달리기 액션
 	void StartRunning();
 	void Running();
 	void StopRunning();
 
-	// LT버튼 입력
+	// 주목 액션
 	void StartAttention();
 	void StopAttention();
 
-	// LS버튼 입력
+	// 웅크리기 액션
 	void ToggleCrouch();
+
+public:
+	// 절벽으로 내려감
+	void ClimbDownCliff();
 
 /*==================입력 버퍼===================*/
 protected:
@@ -252,4 +292,8 @@ protected:
 protected:
 	// 플레이어의 이동 방향
 	EZCDirection GetInputDirection() const;
+
+
+private:
+	class AZCPlayerController* ZCPlayerController = nullptr;
 };

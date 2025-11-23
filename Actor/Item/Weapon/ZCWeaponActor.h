@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Actor/Item/ZCItemActor.h"
-#include "Gameplay/ZCElementInfo.h"
+#include "GameData/Struct/ZCChemistryStruct.h"
 #include "ZCWeaponActor.generated.h"
 
 UENUM(BlueprintType)
@@ -23,16 +23,14 @@ class ZELDA_API AZCWeaponActor : public AZCItemActor
 	GENERATED_BODY()
 
 public:
-	AZCWeaponActor();
+	AZCWeaponActor(const FObjectInitializer& ObjectInitializer);
 	
 	/*===========오버라이드 함수들===========*/
 protected:
 	virtual void PostInitializeComponents() override;
-	//IZCItem인터페이스 오버라이드
-	virtual const FZCItemTable* GetInfo() const override { return WeaponInfo; }
 
 public:
-	virtual void Initialize(FZCItemTable* NewItem) override;
+	virtual void Initialize(FZCActorTable* NewItem) override;
 	
 	/*===========Getter / Settger===========*/
 public:

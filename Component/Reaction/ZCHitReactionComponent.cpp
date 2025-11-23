@@ -11,6 +11,8 @@
 
 #include "Development/ZCLogger.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(ZCHitReactionComponent)
+
 // Sets default values for this component's properties
 UZCHitReactionComponent::UZCHitReactionComponent()
 {

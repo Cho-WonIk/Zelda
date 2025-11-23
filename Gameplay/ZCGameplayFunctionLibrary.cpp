@@ -2,10 +2,24 @@
 
 
 #include "Gameplay/ZCGameplayFunctionLibrary.h"
+#include "CollisionShape.h"
 #include "Engine/OverlapResult.h"
 #include "Damage/ZCDamage.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemTable.h"
+#include "GameData/Table/ChemistrySystemTable.h"
 #include "World/Subsystem/ZCWorldSubsystem.h"
+#include "Physics/ZCShape.h"
+
+#include "Development/ZCDebug.h"
+#if !UE_BUILD_SHIPPING
+namespace Zelda::Debug::Gameplay
+{
+	static bool bDrawDebugAll = false;
+	static bool bDrawShape = false;
+
+	static FAutoConsoleVariableRef CVar_DebugAll(Zelda::Debug::Gameplay::all, bDrawDebugAll, TEXT("Gameplay 디버깅 전체 On/Off"), ECVF_Default);
+	static FAutoConsoleVariableRef CVar_DebugPlayer(Zelda::Debug::Gameplay::shape, bDrawShape, TEXT("Gameplay - 히트 콜리전 시각화"), ECVF_Default);
+}
+#endif
 
 // GameplayStatics 내부 헬퍼 함수
 /** @RETURN True if weapon trace from Origin hits component VictimComp.  OutHitResult will contain properties of the hit. */
@@ -63,7 +77,7 @@ static bool ComponentIsDamageableFrom(UPrimitiveComponent* VictimComp, FVector c
 
 float UZCGameplayFunctionLibrary::ApplyDamage(FElementInfo& ElementInfo, AActor* DamagedActor, float BaseDamage, AController* EventInstigator, AActor* DamageCauser, TSubclassOf<UZCDamageType> DamageTypeClass)
 {
-	if (DamagedActor && (BaseDamage != 0.f))
+	if (DamagedActor)// && (BaseDamage != 0.f))
 	{
 		TSubclassOf<UZCDamageType> const ValidDamageType = DamageTypeClass ? DamageTypeClass : TSubclassOf<UZCDamageType>(UZCDamageType::StaticClass());
 		FZCDamageEvent DamageEvent(ValidDamageType, ElementInfo.ElementTag, ElementInfo.Duration, ElementInfo.SpreadCount);
@@ -102,6 +116,19 @@ bool UZCGameplayFunctionLibrary::ApplyRadialDamageWithFalloff(FElementInfo& Elem
 	TArray<FOverlapResult> Overlaps;
 	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
 	{
+#if !UE_BUILD_SHIPPING
+		using namespace Zelda::Debug::Gameplay;
+
+		if (bDrawDebugAll || bDrawShape)
+		{
+			const FColor InnerColor = FColor::Green;
+			const FColor OuterColor = FColor::Red;
+
+			DrawDebugSphere(World, Origin, DamageInnerRadius, 16, InnerColor, false, 0.125f, 0, 1.f);
+			DrawDebugSphere(World, Origin, DamageOuterRadius, 16, OuterColor, false, 0.125f, 0, 1.f);
+
+		}
+#endif //!UE_BUILD_SHIPPING
 		World->OverlapMultiByChannel(Overlaps, Origin, FQuat::Identity, DamagePreventionChannel, FCollisionShape::MakeSphere(DamageOuterRadius), SphereParams);
 	}
 
@@ -137,11 +164,83 @@ bool UZCGameplayFunctionLibrary::ApplyRadialDamageWithFalloff(FElementInfo& Elem
 		DmgEvent.Origin = Origin;
 		DmgEvent.Params = FRadialDamageParams(BaseDamage, MinimumDamage, DamageInnerRadius, DamageOuterRadius, DamageFalloff);
 
-
-		for (TMap<AActor*, TArray<FHitResult>>::TIterator It(OverlapComponentMap); It; ++It)
+		for (const auto& It : OverlapComponentMap)
 		{
-			AActor* const Victim = It.Key();
-			TArray<FHitResult> const& ComponentHits = It.Value();
+			AActor* const Victim = It.Key;
+			TArray<FHitResult> const& ComponentHits = It.Value;
+			DmgEvent.ComponentHits = ComponentHits;
+
+			Victim->TakeDamage(BaseDamage, DmgEvent, InstigatedByController, DamageCauser);
+
+			bAppliedDamage = true;
+		}
+
+	}
+
+	return bAppliedDamage;
+}
+
+bool UZCGameplayFunctionLibrary::ApplyShapeDamage(FElementInfo& ElementInfo, const UObject* WorldContextObject, float BaseDamage, const FTransform& OwnerTransform, const FZCShape& ZCDamageShape, TSubclassOf<UZCDamageType> DamageTypeClass, const TArray<AActor*>& IgnoreActors, AActor* DamageCauser, AController* InstigatedByController, ECollisionChannel DamagePreventionChannel)
+{
+	// 위치/회전 추출
+	FVector Origin;
+	FQuat   Rotation;
+	FCollisionShape DamageShape;
+	ZCDamageShape.BuildWorldQuery(OwnerTransform, Origin, Rotation, DamageShape);
+
+	FCollisionQueryParams ShapeParams(SCENE_QUERY_STAT(ApplyShapeDamage), false, DamageCauser);
+	ShapeParams.AddIgnoredActors(IgnoreActors);
+
+	TArray<FOverlapResult> Overlaps;
+	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
+	{
+#if !UE_BUILD_SHIPPING
+		using namespace Zelda::Debug::Gameplay;
+
+		if (bDrawDebugAll || bDrawShape)
+		{
+			Zelda::DrawDebugShape(World, ZCDamageShape, OwnerTransform, FColor::Red, 1.5f, 0.125f, 0, false, true, 6.0f);
+		}
+
+#endif //!UE_BUILD_SHIPPING
+		World->OverlapMultiByChannel(Overlaps, Origin, Rotation, DamagePreventionChannel, DamageShape, ShapeParams);
+	}
+
+	TMap<AActor*, TArray<FHitResult> > OverlapComponentMap;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* const OverlapActor = Overlap.OverlapObjectHandle.FetchActor();
+
+		if (OverlapActor && OverlapActor->CanBeDamaged() && OverlapActor != DamageCauser && Overlap.Component.IsValid())
+		{
+			FHitResult Hit;
+			if (ComponentIsDamageableFrom(Overlap.Component.Get(), Origin, DamageCauser, IgnoreActors, DamagePreventionChannel, Hit))
+			{
+				TArray<FHitResult>& HitList = OverlapComponentMap.FindOrAdd(OverlapActor);
+				HitList.Add(Hit);
+			}
+		}
+	}
+
+	bool bAppliedDamage = false;
+
+	if (OverlapComponentMap.Num() > 0)
+	{
+		TSubclassOf<UZCDamageType> const ValidDamageTypeClass = DamageTypeClass ? DamageTypeClass : TSubclassOf<UZCDamageType>(UZCDamageType::StaticClass());
+
+		FZCRadialDamageEvent DmgEvent;
+
+		DmgEvent.ElementTag = ElementInfo.ElementTag;
+		DmgEvent.ElementDuration = ElementInfo.Duration;
+		DmgEvent.ElementSpreadingCount = ElementInfo.SpreadCount;
+
+		DmgEvent.DamageTypeClass = ValidDamageTypeClass;
+		DmgEvent.Origin = Origin;
+
+		for (const auto &It : OverlapComponentMap)
+		{
+			AActor* const Victim = It.Key;
+			TArray<FHitResult> const& ComponentHits = It.Value;
 			DmgEvent.ComponentHits = ComponentHits;
 
 			Victim->TakeDamage(BaseDamage, DmgEvent, InstigatedByController, DamageCauser);
@@ -151,4 +250,46 @@ bool UZCGameplayFunctionLibrary::ApplyRadialDamageWithFalloff(FElementInfo& Elem
 	}
 
 	return bAppliedDamage;
+}
+
+
+bool UZCGameplayFunctionLibrary::ApplyTouchDamage(FElementInfo& ElementInfo, const UObject* WorldContextObject, float BaseDamage, const FVector& Start, const FVector& Direction, TSubclassOf<UZCDamageType> DamageTypeClass, const TArray<AActor*>& IgnoreActors, AActor* DamageCauser, AController* InstigatedByController, ECollisionChannel DamagePreventionChannel)
+{
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(ApplyLineDamage), false, DamageCauser);
+	TraceParams.AddIgnoredActors(IgnoreActors);
+
+	FHitResult HitResult;
+
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+	if (!World) return false;
+
+	const float TouchTraceLength = 3.0f;
+	const FVector End = Start + Direction * TouchTraceLength;
+
+#if !UE_BUILD_SHIPPING
+	using namespace Zelda::Debug::Gameplay;
+
+	if (bDrawDebugAll)
+	{
+		DrawDebugLine(World, Start, End, FColor::Red, false, 1.5f, 0, 15.f);
+	}
+
+#endif // !UE_BUILD_SHIPPING
+
+	const bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, DamagePreventionChannel, TraceParams);
+
+	if (!bHit) return false;
+
+	AActor* const HitActor = HitResult.GetActor();
+
+	if (!HitActor || !HitActor->CanBeDamaged() || HitActor == DamageCauser) return false;
+
+	// 데미지 타입 유효성 보정
+
+	TSubclassOf<UZCDamageType> const ValidDamageType = DamageTypeClass ? DamageTypeClass : TSubclassOf<UZCDamageType>(UZCDamageType::StaticClass());
+	FZCPointDamageEvent PointDamageEvent(BaseDamage, HitResult, Direction, ValidDamageType, ElementInfo.ElementTag, ElementInfo.Duration, ElementInfo.SpreadCount);
+
+	HitActor->TakeDamage(BaseDamage, PointDamageEvent, InstigatedByController, DamageCauser);
+
+	return true;
 }

@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "GameData/ZCItemTable.h"
-#include "Struct/Struct/ZCItemStruct.h"
+#include "GameData/Table/ZCItemTable.h"
+#include "GameData/Struct/ZCItemStruct.h"
 #include "ZCInventoryComponent.generated.h"
 
 class AZCItemActor;

@@ -5,69 +5,15 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemTable.h"
+#include "GameData/Table/ChemistrySystemTable.h"
+#include "Physics/ZCSurface.h"
+#include "GameData/Struct/ZCChemistryStruct.h"
 #include "ZCMaterialStateComponent.generated.h"
 
 class UZCWorldSubsystem;
-struct FElementInfo;
-class AZCActor;
 class UZCNiagaraComponent;
-
-USTRUCT(BlueprintType)
-struct FElementState
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (GameplayTagFilter = "Element"))
-	FGameplayTag ElementTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Duration = -1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 SpreadingCount = -1;
-
-	// 데미지 단발성 <-> 지속성
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "데미지 지속성"))
-	bool bIsDamageOnce = false;
-
-	// 원소 틱 데미지
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 틱 데미지"))
-	float ElementTickDamage = 0.0f;
-
-	// 원소 전파 데미지(주변에 주는 데미지)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 전파 데미지"))
-	float ElementSpreadDamage = 0.0f;
-
-	// 쿨타임
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float TimeRemaining = -1.0f;
-
-	static const FElementState Empty;
-
-	[[nodiscard]] FORCEINLINE bool IsEmpty() const { return Duration == -1.0f && SpreadingCount == -1; }
-
-	void Reset() { *this = Empty; }
-
-	FElementState() : ElementTag(FGameplayTag::EmptyTag), Duration(-1.0f), SpreadingCount(-1), TimeRemaining(-1.0f) {}
-	FElementState(const FGameplayTag& InElementTag, float InDuration, int32 InPropagationCount) : ElementTag(InElementTag), Duration(InDuration), SpreadingCount(InPropagationCount), TimeRemaining(InDuration) 
-	{
-		bIsDamageOnce = false;
-		ElementTickDamage = 0.0f;
-	}
-
-	void Init(const FReactionOut& Out, int32 InSpreadCount, float SpreadDamage)
-	{
-		ElementTag = Out.NewElementTag;
-		Duration = Out.Duration;
-		bIsDamageOnce = Out.bIsDamageOnce;
-		ElementTickDamage = Out.ElementTickDamage;
-		
-		ElementSpreadDamage = SpreadDamage;
-
-		SpreadingCount = InSpreadCount;
-	}
-};
+class AZCActor;
+struct FElementInfo;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class ZELDA_API UZCMaterialStateComponent : public UActorComponent
@@ -79,68 +25,55 @@ public:
 	UZCMaterialStateComponent();
 
 protected:
-	virtual void InitializeComponent() override;
-	// Called when the game starts
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	// Subsystem으로 전달하는 인터페이스
+	UFUNCTION(BlueprintCallable)
+	void ApplyElementExposure(const FElementInfo& NewElementInfo);
 
-public:
+	void NotifyHit(const FVector& Location, const FVector& Direction);
+
+	bool HasActiveElement() const;
+
+	// Setter
+	void SetCachedOwner(AZCActor* Owner) { OwnerCasted = Owner; }
+	void SetUZCNiagaraComponent(UZCNiagaraComponent* Component) { VFXComponentCached = Component; }
+	void SetMaterial(FGameplayTag& InMaterial) { Material = InMaterial; }
+
+	// Getter
 	UFUNCTION(BlueprintCallable)
 	FORCEINLINE FGameplayTag& GetMaterial() { return Material; }
 
 	UFUNCTION(BlueprintCallable)
-	FORCEINLINE FElementState& GetCurrentElementState() { return CurrentElementState; }
+	FGameplayTag GetCurrentElementTag() const;
 
-	void ApplyElementExposure(const FElementInfo& NewElementInfo);
-	
-	void SetCachedOwner(AZCActor* Owner) { OwnerCasted  = Owner; }
-	void SetUZCNiagaraComponent(UZCNiagaraComponent* Component) { VFXComponentCached = Component; }
+	UFUNCTION(BlueprintCallable)
+	bool IsElementActive() const;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif //WITH_EDITOR
-
-
-protected:
-	void ApplyElement(const FReactionOut& ReactionResult, const int32& SpreadingCount);
-
-	void ProcessElementSpreading();
-
-private:
-	void StartFX(bool bEnabled);
-	void LoopFX(bool bEnabled);
-	void EndFX(bool bEnabled);
+#endif // WITH_EDITOR
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chemistry", meta = (DisplayName = "물질", GameplayTagFilter = "Material"))
 	FGameplayTag Material;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FElementState CurrentElementState;
-
-	// 원소별 현재 델타값 보관
-	UPROPERTY(Transient)
-	TMap<FGameplayTag, float> CurrentThresholdValueMap;
-
-	// 현재 물질 내구도
-	UPROPERTY(Transient)
-	float CurrentDurability;
-
-	// 현재 물질 정보
-	const FMaterialInstanceData* MaterialData;
-
-	// 현재 물질의 상태에 적용된 원소(Ex : 불, 전기, 얼음 등등)
-	const FElementInstanceData* ElementData;
+	// 에디터 전용 (디버깅/테스트용)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chemistry|Debug", meta = (DisplayName = "디버그 원소", GameplayTagFilter = "Element"))
+	FGameplayTag DebugElementTag;
 
 private:
-	class UZCWorldSubsystem* WorldSubsystem = nullptr;
+	// Subsystem에 등록된 데이터를 가리키는 핸들
+	FMaterialHandle SystemHandle;
 
-	class AZCActor* OwnerCasted = nullptr;
-	class UZCNiagaraComponent* VFXComponentCached = nullptr;
+	UPROPERTY(Transient)
+	UZCWorldSubsystem* WorldSubsystem = nullptr;
 
-	FDelegateHandle WordSubsystemHandle;
+	UPROPERTY(Transient)
+	AZCActor* OwnerCasted = nullptr;
+
+	UPROPERTY(Transient)
+	UZCNiagaraComponent* VFXComponentCached = nullptr;
 };

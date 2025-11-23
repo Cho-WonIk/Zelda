@@ -8,7 +8,7 @@ UENUM(BlueprintType)
 enum class EItemType : uint8
 {
 	None        UMETA(DisplayName = "아이템 없음"),
-	Normal      UMETA(DisplayName = "일반 아이템"),	// 일반 아이템
+	Normal      UMETA(DisplayName = "일반 아이템"),
     Weapon	    UMETA(DisplayName = "무기"),
     Shield      UMETA(DisplayName = "방패"),
 	Armor	    UMETA(DisplayName = "갑옷"),

@@ -5,7 +5,9 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Gameplay/GameplayTag/ZCGameplayTag.h"
-#include "Gameplay/ChemistrySystem/ChemistrySystemCharacterTable.h"
+#include "Component/Reaction/Struct/ZCReactionEnum.h"
+#include "GameData/Table/ChemistrySystemCharacterTable.h"
+#include "Physics/ZCSurface.h"
 #include "ZCStateComponent.generated.h"
 
 USTRUCT(BlueprintType)
@@ -26,17 +28,13 @@ struct FCharacterElementState
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "데미지 지속성"))
 	bool bIsDamageOnce = false;
 
-	// 원소 초기 데미지
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage", meta = (DisplayName = "원소 초기 데미지"))
-	float ElementFirstDamage;
-
 	// 원소 틱 데미지
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "원소 틱 데미지"))
 	float ElementTickDamage = 0.0f;
 
 	// 쿨타임
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float TimeRemaining = -1.0f;
+	float TimeRemaining = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (DisplayName = "경직 여부"))
 	bool bStiffness;
@@ -52,17 +50,16 @@ struct FCharacterElementState
 
 	static const FCharacterElementState Empty;
 
-	[[nodiscard]] FORCEINLINE bool IsEmpty() const { return Duration == -1.0f && SpreadingCount == -1; }
+	[[nodiscard]] FORCEINLINE bool IsEmpty() const { return ElementTag == FGameplayTag::EmptyTag; }
 
 	void Reset() { *this = Empty; }
 
-	FCharacterElementState() : ElementTag(FGameplayTag::EmptyTag), Duration(-1.0f), SpreadingCount(-1), TimeRemaining(-1.0f) {}
+	FCharacterElementState() : ElementTag(FGameplayTag::EmptyTag), Duration(-1.0f), SpreadingCount(-1), TimeRemaining(0.0f) {}
 	FCharacterElementState(const FGameplayTag& InElementTag, float InDuration, int32 InPropagationCount) : ElementTag(InElementTag), Duration(InDuration), SpreadingCount(InPropagationCount), TimeRemaining(InDuration)
 	{
 		bIsDamageOnce = false;
 		ElementTickDamage = 0.0f;
 		SpreadingCount = -1;
-		ElementFirstDamage = 0.0f;
 		bStiffness = false;
 		bfriction = false;
 
@@ -76,9 +73,12 @@ struct FCharacterElementState
 		ElementTag = ReactionResult.Tag;
 		Duration = ReactionResult.Duration;
 		bIsDamageOnce = ReactionResult.bIsDamageOnce;
+
 		ElementTickDamage = ReactionResult.TickDamage;
 
 		SpreadingCount = InSpreadingCount;
+
+		TimeRemaining = 0.0f;
 	}
 };
 
@@ -157,6 +157,8 @@ struct FZCStagger
 class UZCWorldSubsystem;
 class UZCNiagaraComponent;
 struct FElementInfo;
+struct FZCShape;
+struct FZCSurfaceInfo;
 class AZCCharacter;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FZCStatChangedDelegate, const FZCStat&);
@@ -190,8 +192,9 @@ protected:
 	
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	// Getter, Setter함수
 public:
+	// 접촉 데미지 전달 로직
+	void NotifyHit(FVector& Location, FVector& Direction);
 
 public:
 	virtual float ApplyDamage(float DamageAmount, const FElementInfo& NewElementInfo, bool IsCritical);
@@ -203,10 +206,22 @@ public:
 	void SetVFXComponent(UZCNiagaraComponent* VFXComp) { VFXComponent = VFXComp; }
 	void SetOwnerCharacter(AZCCharacter* COwner) { OwnerCharacter = COwner; }
 
+	bool IsWeakTag(FGameplayTag& Tag) { return Armor.WeakTag.Contains(Tag); }
+	bool IsStrongTag(FGameplayTag& Tag) { return Armor.StrongTag.Contains(Tag); }
+	bool IsImmutTag(FGameplayTag& Tag) { return Armor.ImmutTag.Contains(Tag); }
+
+	bool IsDamageStaggerFull() { return Stagger.DamageStagger.IsFull(); }
+	bool IsElementStaggerFull() { return !IsElementStaggerEmpty(); }
+
+	bool IsElementStaggerEmpty() { return Stagger.CCStagger.IsEmpty(); }
+
+	bool IsCanPlayElementStaggerMontage() { return IsElementStaggerFull() && Stagger.CCStagger.TimeRemaining == 0.0f; }
+
+	void SetCharacterShape(struct FZCShape* NewShape) { CharacterShape = NewShape; }
+
 protected:
 	virtual float CalculDamage(float DamageAmount, const FGameplayTag& ElementTag, bool IsCritical);
 
-protected:
 	virtual void ApplyCCElement(const FCharacterReactionOut& ReactionResult, const int32& SpreadingCount);
 	
 	void ProcessElementSpreading();
@@ -250,5 +265,10 @@ protected:
 
 	const FCharacterElementInstanceData* ElementData;
 
+	struct FZCShape* CharacterShape;
+
 	class AZCCharacter* OwnerCharacter = nullptr;
+
+	// 마지막으로 충돌한 정보, 로컬값(Mesh 컴포넌트 기준 로컬지점과 법선 벡터)
+	TArray<FZCSurfaceInfo> SufaceHitArray;
 };
